@@ -1,0 +1,9 @@
+noise:
+  gyroscope_std: 0.05
+  accelerometer_std: 0.1
+  gyroscope_bias_std: 0.00001 #0.00349
+  accelerometer_bias_std: 0.0001 #0.049
+  landmark_std: 0.1
+  contact_std: 0.01
+  gps_std: 0.3 #0.09S
+
