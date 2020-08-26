@@ -31,6 +31,7 @@
 #include "tf/transform_listener.h"
 #include "Measurement.h"
 #include "Queue.h"
+#include "NoiseParams.h"
 #include "visualization_msgs/MarkerArray.h"
 #include <mutex>
 
@@ -57,7 +58,7 @@ class GTSAM_ROS {
 
     private: 
         ros::NodeHandle n_;
-        GTSAM::GTSAM_CORE Sam_;
+        GTSAM::GTSAM_CORE Core_;
         ros::Subscriber imu_sub_;
         ros::Subscriber gps_sub_;
         ros::Subscriber linkstates_sub_;
@@ -74,14 +75,16 @@ class GTSAM_ROS {
         bool enable_landmarks_;
         tf::StampedTransform camera_to_imu_transform_;
 
-        Eigen::Vector3d initial_linkstate_;
-        Eigen::Vector4d cur_baselink_orientation_;
-        Eigen::Matrix3d initial_R_;
+        NoiseParams init_params_;
+        gtsam::Vector3 initial_linkstate_;
+        Vector4 cur_baselink_orientation_;
+        gtsam::Matrix33 initial_R_;
         tf::StampedTransform base_to_gps_transform_;
-        Eigen::Matrix<double,3,1> initial_lla_;
-        Eigen::Matrix<double,3,1> initial_ecef_;
+        gtsam::Vector3 initial_lla_;
+        gtsam::Vector3 initial_ecef_;
         double initial_yaw_;
-        Eigen::Vector3d Og0_to_Ob0_;
+        gtsam::Vector3 Og0_to_Ob0_;
+        
         std::ofstream file;
         std::string gps_file_path_;
         bool output_gps_;
@@ -94,8 +97,8 @@ class GTSAM_ROS {
         void linkstatesCallback(const gazebo_msgs::LinkStates::ConstPtr& msg);  
         void landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg);
 
-        Eigen::Vector3d lla_to_ecef(const Eigen::Matrix<double,3,1>& lla);
-        Eigen::Matrix<double,3,1> lla_to_enu(const Eigen::Matrix<double,3,1>& lla);
+        gtsam::Vector3 lla_to_ecef(const gtsam::Vector3& lla);
+        gtsam::Vector3 lla_to_enu(const gtsam::Vector3& lla);
 
         void publishLandmarkMeasurementMarkers(std::shared_ptr<LandmarkMeasurement> ptr);
 };

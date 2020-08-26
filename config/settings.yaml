@@ -11,9 +11,6 @@ settings:
   visualization_markers_topic: "/markers"
   enable_landmarks: false
   landmarks_topic: "/landmarks"
-  enable_kinematics: false
-  kinematics_topic: "/kinematics"
-  contact_topic: "/contacts"
   raw_gps_output_path: "/home/chenli/vrx_ws/src/vrx/invariant-ekf-ros/inekf_ros/tests/result/data_odo_xyz.csv"
 
 #settings:

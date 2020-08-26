@@ -13,42 +13,42 @@
 
 #include "gtsam_ros.h"
 using namespace std;
-using namespace gtsam;
 
 // Constructor
 GTSAM_ROS::GTSAM_ROS(ros::NodeHandle n) : n_(n) {}
 
-// Initialize ROS node and filter
+// Initialize ROS node and gtsam core
 void GTSAM_ROS::init() {
     // Create private node handle
     ros::NodeHandle nh("~");
-/*
-    // Set noise parameters
-    NoiseParams params;
-    double std, cov;
-    if (nh.getParam("noise/gyroscope_std", std)) { 
-        params.setGyroscopeNoise(std);
-    }
-    if (nh.getParam("noise/accelerometer_std", std)) { 
-        params.setAccelerometerNoise(std);
-    }
-    if (nh.getParam("noise/gyroscope_bias_std", std)) { 
-        params.setGyroscopeBiasNoise(std);
-    }
-    if (nh.getParam("noise/accelerometer_bias_std", std)) { 
-        params.setAccelerometerBiasNoise(std);
-    }
-    if (nh.getParam("noise/landmark_std", std)) { 
-        params.setLandmarkNoise(std);
-    }
-    if (nh.getParam("noise/contact_std", std)) { 
-        params.setContactNoise(std);
-    }
-    if (nh.getParam("noise/gps_std", std)) { 
-        params.setGpsNoise(std);
-    }
-    filter_.setNoiseParams(params);
 
+    // Set noise parameters
+    gtsam::Vector12 calibration = gtsam::Vector12::Zero();
+    double std, cov;
+    nh.param<double>("noise/accelerometer_std", std, 0.01);
+    init_params_.setAccelerometerNoise(std);
+    calibration(6) = std;
+    nh.param<double>("noise/gyroscope_std", std, 0.000175);
+    init_params_.setGyroscopeNoise(std);
+    calibration(7) = std;
+    nh.param<double>("noise/integration_std", std, 0);
+    init_params_.setIntegrationNoise(std);
+    calibration(8) = std;
+    nh.param<double>("noise/accelerometer_bias_std", std, 0.000167);
+    init_params_.setAccelerometerBiasNoise(std);
+    calibration(9) = std;
+    nh.param<double>("noise/gyroscope_bias_std", std, 2.91e-006);
+    init_params_.setGyroscopeBiasNoise(std);
+    calibration(10) = std;
+    nh.param<double>("noise/average_delta_t", std, 0.0100395199348279);
+    init_params_.setAverageDeltaT(std);
+    calibration(11) = std;
+    nh.param<double>("noise/landmark_std", std, 0.1);
+    init_params_.setLandmarkNoise(std);
+    nh.param<double>("noise/gps_std", std, 0.3);
+    init_params_.setGpsNoise(std);
+    //filter_.setNoiseParams(params);
+/*
     // Set initial state and covariance
     RobotState state;
     Eigen::Matrix3d R_init = Eigen::Matrix3d::Identity();
@@ -116,6 +116,8 @@ void GTSAM_ROS::init() {
     cout << filter_.getState() << endl;
     cout << filter_.getNoiseParams() << endl;
 */
+    gtsam::Vector3 position = gtsam::Vector3::Zero();
+    Core_.initialize(calibration, position);
 /*
     // Set prior landmarks if given
     mapIntVector3d prior_landmarks;
@@ -182,8 +184,8 @@ void GTSAM_ROS::subscribe() {
     imu_frame_id_ = imu_msg->header.frame_id;
 
     Eigen::Quaterniond quat(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
-    Eigen::Matrix<double,3,1> euler = quat.toRotationMatrix().eulerAngles(0, 1, 2);
-    initial_yaw_ = euler(2,0);
+    Vetor3 euler = quat.toRotationMatrix().eulerAngles(0, 1, 2);
+    initial_yaw_ = euler(2);
     //filter_.SetTfEnuOdo(euler);
 
     ROS_INFO("IMU message received. IMU frame is set to %s.", imu_frame_id_.c_str());
@@ -296,7 +298,46 @@ void GTSAM_ROS::imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
 // GPS Callback function
 void GTSAM_ROS::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     shared_ptr<Measurement> ptr(new GpsMeasurement(msg));
-    m_queue_.push(ptr);
+    //m_queue_.push(ptr);
+
+    geometry_msgs::PoseWithCovarianceStamped::Ptr pose_msg;
+    pose_msg->header.seq = msg->header.seq;
+    pose_msg->header.stamp = msg->header.stamp;
+    pose_msg->header.frame_id = base_frame_id_; 
+    gtsam::Vector3 position = lla_to_enu(ptr->getData());
+    pose_msg->pose.pose.position.x = position(0); 
+    pose_msg->pose.pose.position.y = position(1); 
+    pose_msg->pose.pose.position.z = position(2); 
+    /*
+    Eigen::Quaternion<double> orientation(state.getRotation());
+    orientation.normalize();
+    // Transform from imu frame to base frame
+    tf::Transform imu_pose;
+    imu_pose.setRotation( tf::Quaternion(orientation.x(),orientation.y(),orientation.z(),orientation.w()) );
+    imu_pose.setOrigin( tf::Vector3(position(0),position(1),position(2)) );
+    tf::Transform base_pose = imu_to_base_transform*imu_pose;
+    tf::Quaternion base_orientation = base_pose.getRotation().normalize();
+    tf::Vector3 base_position = base_pose.getOrigin();  
+    // Construct message
+    pose_msg->pose.pose.position.x = base_position.getX(); 
+    pose_msg->pose.pose.position.y = base_position.getY(); 
+    pose_msg->pose.pose.position.z = base_position.getZ(); 
+    pose_msg->pose.pose.orientation.w = base_orientation.getW();
+    pose_msg->pose.pose.orientation.x = base_orientation.getX();
+    pose_msg->pose.pose.orientation.y = base_orientation.getY();
+    pose_msg->pose.pose.orientation.z = base_orientation.getZ();
+    Eigen::Matrix<double,6,6> P_pose; // TODO: convert covariance from imu to body frame (adjoint?)
+    P_pose.block<3,3>(0,0) = P.block<3,3>(0,0);
+    P_pose.block<3,3>(0,3) = P.block<3,3>(0,6);
+    P_pose.block<3,3>(3,0) = P.block<3,3>(6,0);
+    P_pose.block<3,3>(3,3) = P.block<3,3>(6,6);
+    for (int i=0; i<36; ++i) {
+        pose_msg->pose.covariance[i] = P_pose(i);
+    }
+    */
+
+    shared_ptr<Measurement> pose_ptr(new PoseMeasurement(pose_msg));
+    m_queue_.push(pose_tpr);
 }
 
 // Link States Callback function
@@ -312,14 +353,14 @@ void GTSAM_ROS::landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg)
 }
 */
 // reference to https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
-Eigen::Vector3d GTSAM_ROS::lla_to_ecef(const Eigen::Matrix<double,3,1>& lla) {
+gtsam::Vector3 GTSAM_ROS::lla_to_ecef(const gtsam::Vector3& lla) {
     const double equatorial_radius = 6378137.0;
     const double polar_radius = 6356752.31424518;
     const double square_ratio = pow(polar_radius,2) / pow(equatorial_radius,2);
 
-    const double lat = lla(0,0) * M_PI / 180;
-    const double lon = lla(1,0) * M_PI / 180;
-    const double alt = lla(2,0);
+    const double lat = lla(0) * M_PI / 180;
+    const double lon = lla(1) * M_PI / 180;
+    const double alt = lla(2);
     const double N = equatorial_radius / sqrt(1 - (1-square_ratio) * pow(sin(lat),2));
 
     const double z = (square_ratio * N + alt) * sin(lat);
@@ -327,18 +368,18 @@ Eigen::Vector3d GTSAM_ROS::lla_to_ecef(const Eigen::Matrix<double,3,1>& lla) {
     const double x = q * cos(lon);
     const double y = q * sin(lon);
 
-    return (Eigen::Vector3d() << x, y, z).finished();
+    return (gtsam::Vector3() << x, y, z).finished();
 }
 
-Eigen::Matrix<double,3,1> GTSAM_ROS::lla_to_enu(const Eigen::Matrix<double,3,1>& lla) {
+gtsam::Vector3 GTSAM_ROS::lla_to_enu(const gtsam::Vector3& lla) {
     // readings are geodetic
-    Eigen::Vector3d cur_ecef = lla_to_ecef(lla);
-    Eigen::Vector3d r_ecef = cur_ecef - initial_ecef_;
+    gtsam::Vector3 cur_ecef = lla_to_ecef(lla);
+    gtsam::Vector3 r_ecef = cur_ecef - initial_ecef_;
 
     double phi = initial_lla_(0) * M_PI / 180;
     double lam = initial_lla_(1) * M_PI / 180;
 
-    Eigen::Matrix3d R = (Eigen::Matrix3d() <<
+    gtsam::Matrix33 R = (gtsam::Matrix33() <<
         -sin(lam),          cos(lam),           0,
         -cos(lam)*sin(phi), -sin(lam)*sin(phi), cos(phi),
         cos(lam)*cos(phi),  sin(lam)*cos(phi),  sin(phi)
@@ -360,7 +401,7 @@ void GTSAM_ROS::mainIsam2Thread() {
         // Try next item (Blocking)
         m_queue_.pop(m_ptr);
         if (m_ptr->getType() == IMU) {
-            ROS_INFO("First IMU measurement received. Starting Filter.");
+            ROS_INFO("First IMU measurement received. Starting GTSAM.");
             t_last = m_ptr->getTime();
             imu_ptr_last = dynamic_pointer_cast<ImuMeasurement>(m_ptr);
             break;
@@ -372,7 +413,7 @@ void GTSAM_ROS::mainIsam2Thread() {
     while (ros::ok()) {
         // Throw warning if measurement queue is getting too large
         if (m_queue_.size() > MAX_QUEUE_SIZE) {
-            ROS_WARN("Measurement queue size (%d) is greater than MAX_QUEUE_SIZE. Filter is not realtime!", m_queue_.size());
+            ROS_WARN("Measurement queue size (%d) is greater than MAX_QUEUE_SIZE. GTSAM is not realtime!", m_queue_.size());
         }   
         // Wait until buffer is full
         while(m_queue_.size() < QUEUE_BUFFER_SIZE) {
@@ -387,7 +428,8 @@ void GTSAM_ROS::mainIsam2Thread() {
                 // ROS_INFO("Propagating state with IMU measurements.");
                 auto imu_ptr = dynamic_pointer_cast<ImuMeasurement>(m_ptr);
                 t = imu_ptr->getTime();
-                filter_.Propagate(imu_ptr_last->getData(), t - t_last);
+                //filter_.Propagate(imu_ptr_last->getData(), t - t_last);
+                Core_.addIMU(imu_ptr);
                 t_last = t;
                 imu_ptr_last = imu_ptr;
 
@@ -455,6 +497,11 @@ void GTSAM_ROS::mainIsam2Thread() {
                 
                 
                 //filter_.CorrectGPS(base_Ob);
+                break;
+            }
+            case POSE: {
+                auto pose_ptr = dynamic_pointer_cast<PoseMeasurement>(m_ptr);
+                Core_.addGPS(pose_ptr);
                 break;
             }
             case LINK: {
@@ -579,7 +626,7 @@ void GTSAM_ROS::outputPublishingThread() {
     tf::TransformListener listener;
     tf::StampedTransform imu_to_base_transform;
     try {
-        listener.waitForTransform(base_frame_id, imu_frame_id_, ros::Time(0), ros::Duration(10.0) );
+        listener.waitForTransform(base_frame_id, imu_frame_id_, ros::Time(0), ros::Duration(1.0) );
         listener.lookupTransform(base_frame_id, imu_frame_id_, ros::Time(0), imu_to_base_transform);
         ROS_INFO("Tranform between frames %s and %s was found.", imu_frame_id_.c_str(), base_frame_id.c_str());
     } catch (tf::TransformException ex) {
@@ -589,7 +636,7 @@ void GTSAM_ROS::outputPublishingThread() {
 
     // Create publishers for pose and state messages
     ros::Publisher pose_pub = n_.advertise<geometry_msgs::PoseWithCovarianceStamped>(pose_topic, 1000);
-    ros::Publisher state_pub = n_.advertise<inekf_msgs::State>(state_topic, 1000);
+    //ros::Publisher state_pub = n_.advertise<inekf_msgs::State>(state_topic, 1000);
     static tf::TransformBroadcaster tf_broadcaster;
     
     // Init loop params
@@ -599,17 +646,23 @@ void GTSAM_ROS::outputPublishingThread() {
 
     // Main loop
     while(true) {
+        gtsam::Pose3 pose = Core_.getCurPose();
         /*
         RobotState state = filter_.getState();
         Eigen::MatrixXd X = state.getX();
         Eigen::MatrixXd P = state.getP();
-
+        */
+        
         // Create and send pose message
         geometry_msgs::PoseWithCovarianceStamped pose_msg;
         pose_msg.header.seq = seq;
         pose_msg.header.stamp = ros::Time::now();
         pose_msg.header.frame_id = map_frame_id_; 
-        Eigen::Vector3d position = state.getPosition();
+        Eigen::Vector3d position = pose.translation().vector();
+        pose_msg.pose.pose.position.x = position(0); 
+        pose_msg.pose.pose.position.y = position(1); 
+        pose_msg.pose.pose.position.z = position(2); 
+        /*
         Eigen::Quaternion<double> orientation(state.getRotation());
         orientation.normalize();
         // Transform from imu frame to base frame
@@ -635,8 +688,10 @@ void GTSAM_ROS::outputPublishingThread() {
         for (int i=0; i<36; ++i) {
             pose_msg.pose.covariance[i] = P_pose(i);
         }
+        */
         pose_pub.publish(pose_msg);
 
+        /*
         // Create and send tf message
         tf_broadcaster.sendTransform(tf::StampedTransform(base_pose, ros::Time::now(), map_frame_id_, base_frame_id));
 

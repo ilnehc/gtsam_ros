@@ -16,7 +16,6 @@
 #include <chrono>
 
 using namespace std;
-using namespace gtsam;
 
 int main(int argc, char **argv) {
     // Initialize ROS

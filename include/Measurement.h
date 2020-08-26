@@ -18,13 +18,14 @@
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/NavSatFix.h"
+#include "geometry_msgs/PoseWithCovariance.h"
 #include "gazebo_msgs/LinkStates.h"
 #include "tf/transform_listener.h"
 
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
 
-enum MeasurementType {EMPTY, IMU, GPS, LINK, LANDMARK};
+enum MeasurementType {EMPTY, IMU, GPS, POSE, LINK, LANDMARK};
 
 
 class Measurement {
@@ -70,9 +71,22 @@ class GpsMeasurement : public Measurement {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         GpsMeasurement(const sensor_msgs::NavSatFix::ConstPtr& msg);
         Eigen::VectorXd getData();
+        Eigen::VectorXd getOri();
 
     private: 
         Eigen::Matrix<double,3,1> data_;
+};
+
+class PoseMeasurement : public Measurement {
+
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        PoseMeasurement(const geometry_msgs::PoseWithCovariance::ConstPtr& msg);
+        Eigen::VectorXd getData();
+
+    private: 
+        Eigen::Matrix<double,3,1> data_;    // x y z
+        Eigen::Matrix<double,4,1> ori_;     // x y z w
 };
 
 class GtLinkMeasurement : public Measurement {

@@ -51,6 +51,20 @@ GpsMeasurement::GpsMeasurement(const sensor_msgs::NavSatFix::ConstPtr& msg) {
 }
 Eigen::VectorXd GpsMeasurement::getData() { return data_; }
 
+// Construct Pose measurement
+PoseMeasurement::PoseMeasurement(const geometry_msgs::PoseWithCovariance::ConstPtr& msg) {
+    t_ = msg->header.stamp.toSec();
+    data_ << msg->pose.position.x, 
+             msg->pose.position.y, 
+             msg->pose.position.z;
+    ori_ << msg->pose.orientation.x,
+            msg->pose.orientation.y,
+            msg->pose.orientation.z,
+            msg->pose.orientation.w;
+    type_ = POSE;
+}
+Eigen::VectorXd PoseMeasurement::getData() { return data_; }
+
 // Construct ground truth LinkStates measurement
 GtLinkMeasurement::GtLinkMeasurement(const gazebo_msgs::LinkStates::ConstPtr& msg, const double t) {
     t_ = t;
