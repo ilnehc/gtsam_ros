@@ -52,7 +52,8 @@ using symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
 namespace GTSAM {
 
-struct RobotxCalibration {
+class RobotxCalibration {
+public:
     double body_ptx;
     double body_pty;
     double body_ptz;
@@ -65,26 +66,14 @@ struct RobotxCalibration {
     double accelerometer_bias_sigma;
     double gyroscope_bias_sigma;
     double average_delta_t;
-  
-  	RobotxCalibration(const Vector12& calibration) { 
-      	body_ptx = calibration(0);
-    	body_pty = calibration(1);
-    	body_ptz = calibration(2);
-    	body_prx = calibration(3);
-    	body_pry = calibration(4);
-    	body_prz = calibration(5);
-    	accelerometer_sigma = calibration(6);
-    	gyroscope_sigma = calibration(7);
-    	integration_sigma = calibration(8);
-    	accelerometer_bias_sigma = calibration(9);
-    	gyroscope_bias_sigma = calibration(10);
-    	average_delta_t = calibration(11);
-	}
+
+    RobotxCalibration();
+  	RobotxCalibration(const Vector12& calibration);
 };
 
 class GTSAM_CORE {
 public:
-    void initialzie(Vector12& calibration, Vector3& position);
+    void initialize(Vector12& calibration, Vector3& position);
     Pose3 getCurPose();
   	Values getResult();
     Matrix getMarginalPoseCov();
@@ -95,7 +84,6 @@ public:
     void addIMU(shared_ptr<ImuMeasurement> ptr);
 
 private:
-    std::shared_ptr<PreintegratedImuMeasurements> current_summarized_measurement;
 	double t1;
   	double t2;
   	double dt;
@@ -104,8 +92,9 @@ private:
     uint64_t GPS_update_count;
   	int gps_skip;
 
-    ISAM2Params imu_params;
-    noiseModel noise_model_gps;
+    boost::shared_ptr<PreintegrationParams> imu_params;
+    boost::shared_ptr<PreintegratedImuMeasurements> current_summarized_measurement;
+    noiseModel::Diagonal::shared_ptr noise_model_gps;
 	imuBias::ConstantBias current_bias;
     Pose3 current_pose_global;
     Matrix current_pose_cov;

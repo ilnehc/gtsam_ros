@@ -144,6 +144,7 @@ void GTSAM_ROS::init() {
     // ----- Settings --------
     nh.param<string>("settings/map_frame_id", map_frame_id_, "/map");
     nh.param<bool>("settings/enable_landmarks", enable_landmarks_, false);
+    nh.param<bool>("settings/enable_linkstates", enable_linkstates, false);
     output_gps_ = false;
     if (nh.getParam("settings/raw_gps_output_path", gps_file_path_)) { 
         output_gps_ = true;
@@ -184,7 +185,7 @@ void GTSAM_ROS::subscribe() {
     imu_frame_id_ = imu_msg->header.frame_id;
 
     Eigen::Quaterniond quat(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
-    Vetor3 euler = quat.toRotationMatrix().eulerAngles(0, 1, 2);
+    Eigen::Vector3d euler = quat.toRotationMatrix().eulerAngles(0, 1, 2);
     initial_yaw_ = euler(2);
     //filter_.SetTfEnuOdo(euler);
 
@@ -197,17 +198,16 @@ void GTSAM_ROS::subscribe() {
     sensor_msgs::NavSatFix::ConstPtr gps_msg = ros::topic::waitForMessage<sensor_msgs::NavSatFix>(gps_topic);
     gps_frame_id_ = gps_msg->header.frame_id;
     // TODO: Convert output from IMU frame to base frame 
-    string base_frame_id;
-    nh.param<string>("settings/base_frame_id", base_frame_id, "base_link");
-    ROS_INFO("Waiting for tf lookup between frames %s and %s...", gps_frame_id_.c_str(), base_frame_id.c_str());
+    nh.param<string>("settings/base_frame_id", base_frame_id_, "base_link");
+    ROS_INFO("Waiting for tf lookup between frames %s and %s...", gps_frame_id_.c_str(), base_frame_id_.c_str());
     tf::TransformListener listener;
     try {
-        listener.waitForTransform(base_frame_id, gps_frame_id_, ros::Time(0), ros::Duration(1.0) );
-        listener.lookupTransform(base_frame_id, gps_frame_id_, ros::Time(0), base_to_gps_transform_);
-        ROS_INFO("Tranform between frames %s and %s was found.", gps_frame_id_.c_str(), base_frame_id.c_str());
+        listener.waitForTransform(base_frame_id_, gps_frame_id_, ros::Time(0), ros::Duration(1.0) );
+        listener.lookupTransform(base_frame_id_, gps_frame_id_, ros::Time(0), base_to_gps_transform_);
+        ROS_INFO("Tranform between frames %s and %s was found.", gps_frame_id_.c_str(), base_frame_id_.c_str());
     } catch (tf::TransformException ex) {
         ROS_ERROR("%s. Using identity transform.",ex.what());
-        base_to_gps_transform_ = tf::StampedTransform( tf::Transform::getIdentity(), ros::Time::now(), gps_frame_id_, base_frame_id);
+        base_to_gps_transform_ = tf::StampedTransform( tf::Transform::getIdentity(), ros::Time::now(), gps_frame_id_, base_frame_id_);
     }
 
     double x,y,z;
@@ -241,6 +241,7 @@ void GTSAM_ROS::subscribe() {
     }
 
     // Retrieve camera frame_id and transformation between camera and imu
+    /*
     string landmarks_topic;
     if (enable_landmarks_) {
         nh.param<string>("settings/landmarks_topic", landmarks_topic, "/landmarks");
@@ -267,6 +268,7 @@ void GTSAM_ROS::subscribe() {
             camera_to_imu_transform_ = tf::StampedTransform( tf::Transform::getIdentity(), ros::Time::now(), camera_frame_id, imu_frame_id_);
         }   
     }
+    */
 
     // Subscribe to IMU publisher
     ROS_INFO("Subscribing to %s.", imu_topic.c_str());
@@ -281,12 +283,13 @@ void GTSAM_ROS::subscribe() {
         ROS_INFO("Subscribing to %s.", linkstates_topic.c_str());
         linkstates_sub_ = n_.subscribe(linkstates_topic, 1000, &GTSAM_ROS::linkstatesCallback, this);
     }
-
+    /*
     // Subscribe to Landmark publisher
     if (enable_landmarks_) {
         ROS_INFO("Subscribing to %s.", landmarks_topic.c_str());
         landmarks_sub_ = n_.subscribe(landmarks_topic, 1000, &GTSAM_ROS::landmarkCallback, this);
     }
+    */
 }
 
 // IMU Callback function
@@ -297,7 +300,7 @@ void GTSAM_ROS::imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
 
 // GPS Callback function
 void GTSAM_ROS::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
-    shared_ptr<Measurement> ptr(new GpsMeasurement(msg));
+    shared_ptr<GpsMeasurement> ptr(new GpsMeasurement(msg));
     //m_queue_.push(ptr);
 
     geometry_msgs::PoseWithCovarianceStamped::Ptr pose_msg;
@@ -337,7 +340,7 @@ void GTSAM_ROS::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     */
 
     shared_ptr<Measurement> pose_ptr(new PoseMeasurement(pose_msg));
-    m_queue_.push(pose_tpr);
+    m_queue_.push(pose_ptr);
 }
 
 // Link States Callback function
@@ -446,7 +449,7 @@ void GTSAM_ROS::mainIsam2Thread() {
 
                 Eigen::Matrix<double,3,1> gps_xyz = lla_to_enu(gps_ptr->getData());
                 Eigen::Vector3d position = gps_xyz.head(3); //state.getPosition();
-                filter_.CorrectGPS(position);
+                //filter_.CorrectGPS(position);
                 if (output_gps_) {
                     file.open(gps_file_path_.c_str(), ios::app);
                     file.precision(16);
@@ -456,8 +459,8 @@ void GTSAM_ROS::mainIsam2Thread() {
                     file.close();
                 }
 
-                RobotState state = filter_.getState();
-                position = state.getPosition();
+                //RobotState state = filter_.getState();
+                //position = state.getPosition();
                 //Eigen::Quaternion<double> orientation(state.getRotation());
                 Eigen::Quaternion<double> orientation(cur_baselink_orientation_[3],cur_baselink_orientation_[0],cur_baselink_orientation_[1],cur_baselink_orientation_[2]);
                 orientation.normalize();
@@ -543,10 +546,9 @@ void GTSAM_ROS::mainIsam2Thread() {
     }
 }
 
-
+/*
 // Publish line markers between IMU and detected landmarks
 void GTSAM_ROS::publishLandmarkMeasurementMarkers(shared_ptr<LandmarkMeasurement> ptr){
-    /*
     visualization_msgs::MarkerArray markers_msg;
     visualization_msgs::Marker landmark_measurement_msg;
     landmark_measurement_msg.header.frame_id = map_frame_id_;
@@ -600,9 +602,8 @@ void GTSAM_ROS::publishLandmarkMeasurementMarkers(shared_ptr<LandmarkMeasurement
     // Publish
     markers_msg.markers.push_back(landmark_measurement_msg);
     visualization_pub_.publish(markers_msg);
-    */
 }
-
+*/
 
 // Thread for publishing the output of the filter
 void GTSAM_ROS::outputPublishingThread() {

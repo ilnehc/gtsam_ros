@@ -20,7 +20,7 @@ using namespace std;
 NoiseParams::NoiseParams() {
     setGyroscopeNoise(0.01);
     setAccelerometerNoise(0.1);
-    setIntegrationNoise(0.000167);
+    setIntegrationNoise(0);
     setGyroscopeBiasNoise(0.00001);
     setAccelerometerBiasNoise(0.0001);
     setLandmarkNoise(0.1);

@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(vrx_gtsam)
+project(gtsam_ros)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
+SET(CMAKE_CXX_COMPILER /usr/bin/g++)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -19,7 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
 # find_package(Boost REQUIRED COMPONENTS system)
 
 # Boost
-find_package(Boost 1.58 REQUIRED COMPONENTS system)
+find_package(Boost 1.58 REQUIRED COMPONENTS system serialization filesystem thread date_time regex timer chrono)
 include_directories(${Boost_INCLUDE_DIR})
 message("Boost_INCLUDE_DIR: " ${Boost_INCLUDE_DIR})
 
@@ -126,7 +127,7 @@ message("GTSAM_INCLUDE_DIR: " ${GTSAM_INCLUDE_DIR})
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
    INCLUDE_DIRS include
-#  LIBRARIES vrx_gtsam
+#  LIBRARIES gtsam_ros
    CATKIN_DEPENDS roscpp rospy sensor_msgs std_msgs tf
 #  DEPENDS system_lib
 )
@@ -145,7 +146,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/vrx_gtsam.cpp
+#   src/${PROJECT_NAME}/gtsam_ros.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -160,7 +161,7 @@ file(GLOB src_files
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
 )
 add_executable(gtsam_node src/gtsam_node.cpp ${src_files})
-# add_executable(${PROJECT_NAME}_node src/vrx_gtsam_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/gtsam_ros_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -175,6 +176,7 @@ add_executable(gtsam_node src/gtsam_node.cpp ${src_files})
 ## Specify libraries to link a library or executable target against
 message("gtsam_LIBRARIES: " ${gtsam_LIBRARIES})
 target_link_libraries(gtsam_node
+    gtsam
     ${catkin_LIBRARIES}
     ${gtsam_LIBRARIES}
     ${Boost_LIBRARIES}
@@ -230,7 +232,7 @@ target_link_libraries(gtsam_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_vrx_gtsam.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_gtsam_ros.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

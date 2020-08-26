@@ -70,10 +70,12 @@ class GTSAM_ROS {
         std::string imu_frame_id_;
         std::string gps_frame_id_;
         std::string map_frame_id_;
+        std::string base_frame_id_;
         bool publish_visualization_markers_;
         ros::Publisher visualization_pub_;
         bool enable_landmarks_;
         tf::StampedTransform camera_to_imu_transform_;
+        bool enable_linkstates;
 
         NoiseParams init_params_;
         gtsam::Vector3 initial_linkstate_;
@@ -95,12 +97,12 @@ class GTSAM_ROS {
         void imuCallback(const sensor_msgs::Imu::ConstPtr& msg); 
         void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void linkstatesCallback(const gazebo_msgs::LinkStates::ConstPtr& msg);  
-        void landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg);
+        //void landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg);
 
         gtsam::Vector3 lla_to_ecef(const gtsam::Vector3& lla);
         gtsam::Vector3 lla_to_enu(const gtsam::Vector3& lla);
 
-        void publishLandmarkMeasurementMarkers(std::shared_ptr<LandmarkMeasurement> ptr);
+        //void publishLandmarkMeasurementMarkers(std::shared_ptr<LandmarkMeasurement> ptr);
 };
 
 #endif 

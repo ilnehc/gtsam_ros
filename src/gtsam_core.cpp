@@ -17,13 +17,41 @@ using namespace std;
 
 namespace GTSAM {
 
+RobotxCalibration::RobotxCalibration() : body_ptx(0),
+                                         body_pty(0),
+                                         body_ptz(0),
+                                         body_prx(0),
+                                         body_pry(0),
+                                         body_prz(0),
+                                         accelerometer_sigma(0.01),
+                                         gyroscope_sigma(0.000175),
+                                         integration_sigma(0),
+                                         accelerometer_bias_sigma(0.000167),
+                                         gyroscope_bias_sigma(2.91e-006),
+                                         average_delta_t(0.0100395199348279) 
+                                         {}
+
+RobotxCalibration::RobotxCalibration(const Vector12& calibration) : body_ptx(calibration(0)),
+                                                                    body_pty(calibration(1)),
+                                                                    body_ptz(calibration(2)),
+                                                                    body_prx(calibration(3)),
+                                                                    body_pry(calibration(4)),
+                                                                    body_prz(calibration(5)),
+                                                                    accelerometer_sigma(calibration(6)),
+                                                                    gyroscope_sigma(calibration(7)),
+                                                                    integration_sigma(calibration(8)),
+                                                                    accelerometer_bias_sigma(calibration(9)),
+                                                                    gyroscope_bias_sigma(calibration(10)),
+                                                                    average_delta_t(calibration(11)) 
+                                                                    {}
+
 void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
 	// init_state:: quaternion(qx,qy,qz,qw), anglular velocity(omegax, omegay, omegaz), linear acceleration(accx, accy, accz)
 
 	robotx_calibration = RobotxCalibration(calibration);
 
-    Vector6 BodyP = (Vector6() << calibration.body_ptx, calibration.body_pty, calibration.body_ptz,
-                                  calibration.body_prx, calibration.body_pry, calibration.body_prz)
+    Vector6 BodyP = (Vector6() << robotx_calibration.body_ptx, robotx_calibration.body_pty, robotx_calibration.body_ptz,
+                                  robotx_calibration.body_prx, robotx_calibration.body_pry, robotx_calibration.body_prz)
                     .finished();
     auto body_T_imu = Pose3::Expmap(BodyP);
     if (!body_T_imu.equals(Pose3(), 1e-5)) {
@@ -56,15 +84,16 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     auto sigma_init_b = noiseModel::Diagonal::Sigmas((Vector6() << Vector3::Constant(0.100),
                                                                    Vector3::Constant(5.00e-05))
                                                      .finished());
-    current_pose_cov = sigma_init_x;
+    //current_pose_cov = sigma_init_x;
 
     // Set IMU preintegration parameters
-    Matrix33 measured_acc_cov = I_3x3 * pow(calibration.accelerometer_sigma, 2);
-    Matrix33 measured_omega_cov = I_3x3 * pow(calibration.gyroscope_sigma, 2);
+    Matrix33 measured_acc_cov = I_3x3 * pow(robotx_calibration.accelerometer_sigma, 2);
+    Matrix33 measured_omega_cov = I_3x3 * pow(robotx_calibration.gyroscope_sigma, 2);
     // error committed in integrating position from velocities
-    Matrix33 integration_error_cov = I_3x3 * pow(calibration.integration_sigma, 2);
+    Matrix33 integration_error_cov = I_3x3 * pow(robotx_calibration.integration_sigma, 2);
 
-    imu_params = PreintegratedImuMeasurements::Params::MakeSharedU(g_);
+    imu_params = boost::shared_ptr<PreintegrationParams>(PreintegrationParams::MakeSharedU(g_));
+    //imu_params = std::make_shared<PreintegrationParams>(Vector3(0, 0, -g_));
     imu_params->accelerometerCovariance = measured_acc_cov;     // acc white noise in continuous
     imu_params->integrationCovariance = integration_error_cov;  // integration uncertainty continuous
     imu_params->gyroscopeCovariance = measured_omega_cov;       // gyro white noise in continuous
@@ -73,6 +102,7 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     current_summarized_measurement = nullptr;
   
     //ISAM2Params isam_params;
+    ISAM2Params isam_params;
     isam_params.factorization = ISAM2Params::CHOLESKY;
     isam_params.relinearizeSkip = 10;
 
@@ -103,7 +133,9 @@ void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
     auto previous_vel_key = V(GPS_update_count - 1);
     auto previous_bias_key = B(GPS_update_count - 1);
     
-    current_summarized_measurement = std::make_shared<PreintegratedImuMeasurements>(imu_params, current_bias);
+    //current_summarized_measurement = std::make_shared<PreintegratedImuMeasurements>(imu_params, current_bias);
+    current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
+                                        new PreintegratedImuMeasurements(imu_params, current_bias));
     
     // Create IMU factor
     new_factors.emplace_shared<ImuFactor>(previous_pose_key, previous_vel_key,

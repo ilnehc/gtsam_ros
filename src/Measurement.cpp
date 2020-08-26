@@ -52,15 +52,15 @@ GpsMeasurement::GpsMeasurement(const sensor_msgs::NavSatFix::ConstPtr& msg) {
 Eigen::VectorXd GpsMeasurement::getData() { return data_; }
 
 // Construct Pose measurement
-PoseMeasurement::PoseMeasurement(const geometry_msgs::PoseWithCovariance::ConstPtr& msg) {
+PoseMeasurement::PoseMeasurement(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg) {
     t_ = msg->header.stamp.toSec();
-    data_ << msg->pose.position.x, 
-             msg->pose.position.y, 
-             msg->pose.position.z;
-    ori_ << msg->pose.orientation.x,
-            msg->pose.orientation.y,
-            msg->pose.orientation.z,
-            msg->pose.orientation.w;
+    data_ << msg->pose.pose.position.x, 
+             msg->pose.pose.position.y, 
+             msg->pose.pose.position.z;
+    ori_ << msg->pose.pose.orientation.x,
+            msg->pose.pose.orientation.y,
+            msg->pose.pose.orientation.z,
+            msg->pose.pose.orientation.w;
     type_ = POSE;
 }
 Eigen::VectorXd PoseMeasurement::getData() { return data_; }

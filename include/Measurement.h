@@ -18,7 +18,7 @@
 #include "ros/ros.h"
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/NavSatFix.h"
-#include "geometry_msgs/PoseWithCovariance.h"
+#include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "gazebo_msgs/LinkStates.h"
 #include "tf/transform_listener.h"
 
@@ -81,7 +81,7 @@ class PoseMeasurement : public Measurement {
 
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        PoseMeasurement(const geometry_msgs::PoseWithCovariance::ConstPtr& msg);
+        PoseMeasurement(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg);
         Eigen::VectorXd getData();
 
     private: 
