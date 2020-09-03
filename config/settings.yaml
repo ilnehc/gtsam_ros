@@ -1,6 +1,6 @@
 settings:
-  imu_topic: "/sensors/an_device/Imu"
-  gps_topic: "/sensors/an_device/NavSatFix"
+  imu_topic: /wamv/sensors/imu/imu/data #"/sensors/an_device/Imu"
+  gps_topic: /wamv/sensors/gps/gps/fix #"/sensors/an_device/NavSatFix"
   enable_linkstates: false
   map_frame_id : "map"
   base_frame_id: "base_link"
@@ -11,7 +11,7 @@ settings:
   visualization_markers_topic: "/markers"
   enable_landmarks: false
   landmarks_topic: "/landmarks"
-  raw_gps_output_path: "/home/chenli/vrx_ws/src/vrx/invariant-ekf-ros/inekf_ros/tests/result/data_odo_xyz.csv"
+  raw_gps_output_path: "/home/chenli/vrx_ws/src/vrx/gtsam_ros/tests/result/data_odo_xyz.csv"
 
 #settings:
 #  imu_topic: "/imu"

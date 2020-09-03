@@ -161,6 +161,7 @@ file(GLOB src_files
     "${PROJECT_SOURCE_DIR}/src/*.cpp"
 )
 add_executable(gtsam_node src/gtsam_node.cpp ${src_files})
+add_executable(listener_xyz_gtsam_node tests/listener_xyz.cpp)
 # add_executable(${PROJECT_NAME}_node src/gtsam_ros_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -180,6 +181,9 @@ target_link_libraries(gtsam_node
     ${catkin_LIBRARIES}
     ${gtsam_LIBRARIES}
     ${Boost_LIBRARIES}
+)
+target_link_libraries(listener_xyz_gtsam_node
+    ${catkin_LIBRARIES}
 )
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}

@@ -60,6 +60,7 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     }
 
     // Configure different variables
+    t1 = 0;
     GPS_update_count = 1;
     gps_skip = 10;  // Skip this many GPS measurements each time
     g_ = 9.8;
@@ -99,7 +100,9 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     imu_params->gyroscopeCovariance = measured_omega_cov;       // gyro white noise in continuous
     imu_params->omegaCoriolis = w_coriolis;
 
-    current_summarized_measurement = nullptr;
+    //current_summarized_measurement = nullptr;
+    current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
+                                        new PreintegratedImuMeasurements(imu_params, current_bias));
   
     //ISAM2Params isam_params;
     ISAM2Params isam_params;
@@ -186,9 +189,13 @@ void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
 }
 
 void GTSAM_CORE::addIMU(shared_ptr<ImuMeasurement> ptr) {
-	t1 = t2;
-  	t2 = ptr -> getTime();
-  	dt = t2 - t1;
+    if (t1 == 0) {
+        t1 = ptr -> getTime();
+        return;
+    }
+  	double t2 = ptr -> getTime();
+  	double dt = t2 - t1;
+    t1 = t2;
   	Vector3 gyroscope = ptr -> getData().head(3);
   	Vector3 accelerometer = ptr -> getData().tail(3);
   	Vector4 orientation = ptr -> getOri();

@@ -339,7 +339,7 @@ void GTSAM_ROS::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     }
     */
 
-    shared_ptr<Measurement> pose_ptr(new PoseMeasurement(pose_msg));
+    shared_ptr<PoseMeasurement> pose_ptr(new PoseMeasurement(pose_msg));
     m_queue_.push(pose_ptr);
 }
 
@@ -504,6 +504,17 @@ void GTSAM_ROS::mainIsam2Thread() {
             }
             case POSE: {
                 auto pose_ptr = dynamic_pointer_cast<PoseMeasurement>(m_ptr);
+
+                if (output_gps_) {
+                    file.open(gps_file_path_.c_str(), ios::app);
+                    file.precision(16);
+                    double t = pose_ptr->getTime();
+	                size_t t1 = t * 1e9;
+                    Eigen::Vector3d position = pose_ptr->getData();
+                    file << t1 << "," << position(0) << "," << position(1) << "," << position(2) << endl;
+                    file.close();
+                }
+
                 Core_.addGPS(pose_ptr);
                 break;
             }

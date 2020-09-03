@@ -84,9 +84,7 @@ public:
     void addIMU(shared_ptr<ImuMeasurement> ptr);
 
 private:
-	double t1;
-  	double t2;
-  	double dt;
+	  double t1;
     size_t included_imu_measurement_count;
   	double g_;
     uint64_t GPS_update_count;
@@ -95,14 +93,14 @@ private:
     boost::shared_ptr<PreintegrationParams> imu_params;
     boost::shared_ptr<PreintegratedImuMeasurements> current_summarized_measurement;
     noiseModel::Diagonal::shared_ptr noise_model_gps;
-	imuBias::ConstantBias current_bias;
+	  imuBias::ConstantBias current_bias;
     Pose3 current_pose_global;
     Matrix current_pose_cov;
     Vector3 current_velocity_global;
     RobotxCalibration robotx_calibration;
 
     ISAM2 isam2;
-	Values result;  
+	  Values result;  
     // Create the factor graph and values object that will store new factors and values to add to the incremental graph
     NonlinearFactorGraph new_factors;
     Values new_values;
