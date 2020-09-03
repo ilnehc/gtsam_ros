@@ -303,7 +303,7 @@ void GTSAM_ROS::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
     shared_ptr<GpsMeasurement> ptr(new GpsMeasurement(msg));
     //m_queue_.push(ptr);
 
-    geometry_msgs::PoseWithCovarianceStamped::Ptr pose_msg;
+    geometry_msgs::PoseWithCovarianceStamped::Ptr pose_msg(new geometry_msgs::PoseWithCovarianceStamped());
     pose_msg->header.seq = msg->header.seq;
     pose_msg->header.stamp = msg->header.stamp;
     pose_msg->header.frame_id = base_frame_id_; 
