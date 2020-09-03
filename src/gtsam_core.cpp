@@ -100,7 +100,6 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     imu_params->gyroscopeCovariance = measured_omega_cov;       // gyro white noise in continuous
     imu_params->omegaCoriolis = w_coriolis;
 
-    //current_summarized_measurement = nullptr;
     current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
                                         new PreintegratedImuMeasurements(imu_params, current_bias));
   
