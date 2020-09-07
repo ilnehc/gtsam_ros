@@ -135,14 +135,14 @@ void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
     auto previous_vel_key = V(GPS_update_count - 1);
     auto previous_bias_key = B(GPS_update_count - 1);
     
-    //current_summarized_measurement = std::make_shared<PreintegratedImuMeasurements>(imu_params, current_bias);
-    current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
-                                        new PreintegratedImuMeasurements(imu_params, current_bias));
-    
     // Create IMU factor
     new_factors.emplace_shared<ImuFactor>(previous_pose_key, previous_vel_key,
                                           current_pose_key, current_vel_key,
                                           previous_bias_key, *current_summarized_measurement);
+
+    //current_summarized_measurement = std::make_shared<PreintegratedImuMeasurements>(imu_params, current_bias);
+    current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
+                                        new PreintegratedImuMeasurements(imu_params, current_bias));
     
     // Bias evolution as given in the IMU metadata
     auto sigma_between_b = noiseModel::Diagonal::Sigmas((Vector6() <<
@@ -173,6 +173,7 @@ void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
     new_values.insert(current_bias_key, current_bias);
 
     if (GPS_update_count > 1 + 2 * gps_skip){
+        //new_factors.print();
     	isam2.update(new_factors, new_values);
         Marginals marginals(new_factors, new_values);
         current_pose_cov = marginals.marginalCovariance(current_pose_key);

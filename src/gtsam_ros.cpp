@@ -272,11 +272,11 @@ void GTSAM_ROS::subscribe() {
 
     // Subscribe to IMU publisher
     ROS_INFO("Subscribing to %s.", imu_topic.c_str());
-    imu_sub_ = n_.subscribe(imu_topic, 1000, &GTSAM_ROS::imuCallback, this);
+    imu_sub_ = n_.subscribe(imu_topic, 1, &GTSAM_ROS::imuCallback, this);
 
     // Subscribe to GPS publisher
     ROS_INFO("Subscribing to %s.", gps_topic.c_str());
-    gps_sub_ = n_.subscribe(gps_topic, 1000, &GTSAM_ROS::gpsCallback, this);
+    gps_sub_ = n_.subscribe(gps_topic, 1, &GTSAM_ROS::gpsCallback, this);
 
     // Subscribe to link states publisher
     if (enable_linkstates) {
