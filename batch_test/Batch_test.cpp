@@ -212,7 +212,7 @@ int main(int argc, char* argv[]) {
     // double t_offset = gps_measurements[0].time;
     size_t first_gps_pose = 1;
     size_t gps_skip = 10;  // Skip this many GPS measurements each time
-    double g = 9.8;
+    double g = 0;
     auto w_coriolis = Vector3::Zero();  // zero vector
 
     // Configure noise models
@@ -225,9 +225,15 @@ int main(int argc, char* argv[]) {
     //auto current_pose_global = Pose3(Rot3(), gps_measurements[0].position);
     Vector4 current_rotation = imuapproximate(gps_measurements[0].time, imu_measurements);
     auto current_pose_global = Pose3(Rot3(Quaternion(current_rotation[3], current_rotation[0], current_rotation[1], current_rotation[2])), gps_measurements[0].position);
+    Vector4 current_rotation2 = imuapproximate(gps_measurements[1].time, imu_measurements);
+    auto current_pose_global2 = Pose3(Rot3(Quaternion(current_rotation2[3], current_rotation2[0], current_rotation2[1], current_rotation2[2])), gps_measurements[1].position);
 
     // the vehicle is stationary at the beginning at position 0,0,0
     Vector3 current_velocity_global = Vector3::Zero();
+    Vector3 current_velocity_global2 = Vector3::Zero();
+    current_velocity_global2[0] = 0.1;
+    current_velocity_global2[1] = 0.1;
+
     auto current_bias = imuBias::ConstantBias();  // init with zero bias
 
     auto sigma_init_x = noiseModel::Diagonal::Precisions((Vector6() << Vector3::Constant(0.1),	//0
@@ -235,7 +241,7 @@ int main(int argc, char* argv[]) {
                                                          .finished());
     auto sigma_init_v = noiseModel::Diagonal::Sigmas(Vector3::Constant(1.0));	//1000
     auto sigma_init_b = noiseModel::Diagonal::Sigmas((Vector6() << Vector3::Constant(0.100),
-                                                                   Vector3::Constant(0.100))	//5.00e-5
+                                                                   Vector3::Constant(5.00e-5))	//5.00e-5
                                                      .finished());
     // Set IMU preintegration parameters
     Matrix33 measured_acc_cov = I_3x3 * pow(accelerometer_sigma, 2);
@@ -269,17 +275,28 @@ int main(int argc, char* argv[]) {
     size_t j = 0;
     for (size_t i = first_gps_pose; i < gps_measurements.size() - 1; i++) {
         // At each non=IMU measurement we initialize a new node in the graph
-        auto current_pose_key = X(i);
-        auto current_vel_key = V(i);
-        auto current_bias_key = B(i);
+        auto current_pose_key = X(i+1);
+        auto current_vel_key = V(i+1);
+        auto current_bias_key = B(i+1);
         double t = gps_measurements[i].time;
 
         if (i == first_gps_pose) {
             // Create initial estimate and prior on initial pose, velocity, and biases
+            auto current_pose_key1= X(i);
+            auto current_vel_key1 = V(i);
+            auto current_bias_key1 = B(i);
+
+            new_values.insert(current_pose_key1, current_pose_global);
+            new_values.insert(current_vel_key1, current_velocity_global);
+            new_values.insert(current_bias_key1, current_bias);
             new_values.insert(current_pose_key, current_pose_global);
             new_values.insert(current_vel_key, current_velocity_global);
             new_values.insert(current_bias_key, current_bias);
-            new_factors.emplace_shared<PriorFactor<Pose3>>(current_pose_key, current_pose_global, sigma_init_x);
+
+            new_factors.emplace_shared<PriorFactor<Pose3>>(current_pose_key1, current_pose_global, sigma_init_x);
+            new_factors.emplace_shared<PriorFactor<Vector3>>(current_vel_key1, current_velocity_global, sigma_init_v);
+            new_factors.emplace_shared<PriorFactor<imuBias::ConstantBias>>(current_bias_key1, current_bias, sigma_init_b);
+            new_factors.emplace_shared<PriorFactor<Pose3>>(current_pose_key, current_pose_global2, sigma_init_x);
             new_factors.emplace_shared<PriorFactor<Vector3>>(current_vel_key, current_velocity_global, sigma_init_v);
             new_factors.emplace_shared<PriorFactor<imuBias::ConstantBias>>(current_bias_key, current_bias, sigma_init_b);
         } 
@@ -303,9 +320,9 @@ int main(int argc, char* argv[]) {
             current_summarized_measurement->print();
 
             // Create IMU factor
-            auto previous_pose_key = X(i-1);
-            auto previous_vel_key = V(i-1);
-            auto previous_bias_key = B(i-1);
+            auto previous_pose_key = X(i);
+            auto previous_vel_key = V(i);
+            auto previous_bias_key = B(i);
 
             new_factors.emplace_shared<ImuFactor>(previous_pose_key, previous_vel_key,
                                                   current_pose_key, current_vel_key,
