@@ -98,6 +98,7 @@ private:
     Matrix current_pose_cov;
     Vector3 current_velocity_global;
     RobotxCalibration robotx_calibration;
+    Vector4 orientation;
 
     ISAM2 isam2;
 	  Values result;  

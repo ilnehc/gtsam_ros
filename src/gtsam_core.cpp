@@ -63,14 +63,16 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     t1 = 0;
     GPS_update_count = 1;
     gps_skip = 10;  // Skip this many GPS measurements each time
-    g_ = 9.8;
+    g_ = 0; //9.8;  // 0 for rosbag data
     auto w_coriolis = Vector3::Zero();  // zero vector
+    orientation = Vector4::Zero();
 
     // Configure noise models
     noise_model_gps = noiseModel::Diagonal::Precisions((Vector6() << Vector3::Constant(0),
                                                                      Vector3::Constant(1.0/0.07))
                                                             .finished());
 
+    // !!!TODO!!!
     // Set initial conditions for the estimated trajectory
     // initial pose is the reference frame (navigation frame)
     current_pose_global = Pose3(Rot3(), position);
@@ -79,7 +81,7 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     current_bias = imuBias::ConstantBias();  // init with zero bias
 
     auto sigma_init_x = noiseModel::Diagonal::Precisions((Vector6() << Vector3::Constant(0),
-                                                                       Vector3::Constant(1.0))
+                                                                       Vector3::Constant(1.0e-6))   // fix prior pose
                                                          .finished());
     auto sigma_init_v = noiseModel::Diagonal::Sigmas(Vector3::Constant(1000.0));
     auto sigma_init_b = noiseModel::Diagonal::Sigmas((Vector6() << Vector3::Constant(0.100),
@@ -105,26 +107,32 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
   
     //ISAM2Params isam_params;
     ISAM2Params isam_params;
-    isam_params.factorization = ISAM2Params::CHOLESKY;
+    isam_params.factorization = ISAM2Params::QR;    //ISAM2Params::CHOLESKY;
     isam_params.relinearizeSkip = 10;
 
     isam2 = ISAM2(isam_params);
-  
+/*  
     auto current_pose_key = X(GPS_update_count);
     auto current_vel_key = V(GPS_update_count);
     auto current_bias_key = B(GPS_update_count);
-  
+
     new_values.insert(current_pose_key, current_pose_global);
     new_values.insert(current_vel_key, current_velocity_global);
     new_values.insert(current_bias_key, current_bias);
     new_factors.emplace_shared<PriorFactor<Pose3>>(current_pose_key, current_pose_global, sigma_init_x);
     new_factors.emplace_shared<PriorFactor<Vector3>>(current_vel_key, current_velocity_global, sigma_init_v);
     new_factors.emplace_shared<PriorFactor<imuBias::ConstantBias>>(current_bias_key, current_bias, sigma_init_b);
-
+*/
 }
 
 void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
-    ++GPS_update_count;
+
+    if (fabs(orientation[0]) < 1e-5 && fabs(orientation[1]) < 1e-5 && fabs(orientation[2]) < 1e-5 && fabs(orientation[3]) < 1e-5) {
+        printf("################ NO IMU UPDATE ################\n");
+        printf("\n\n");
+        return;
+    }   
+
     double t = ptr -> getTime();
     Vector3 gps = ptr -> getData();
 
@@ -134,11 +142,41 @@ void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
     auto previous_pose_key = X(GPS_update_count - 1);
     auto previous_vel_key = V(GPS_update_count - 1);
     auto previous_bias_key = B(GPS_update_count - 1);
+
+    //++GPS_update_count;
+
+    if (GPS_update_count <= 1) {
+        auto sigma_init_x = noiseModel::Diagonal::Precisions((Vector6() << Vector3::Constant(0),
+                                                                       Vector3::Constant(1.0e-6))   // fix prior pose
+                                                         .finished());
+        auto sigma_init_v = noiseModel::Diagonal::Sigmas(Vector3::Constant(1000.0));
+        auto sigma_init_b = noiseModel::Diagonal::Sigmas((Vector6() << Vector3::Constant(0.100),
+                                                                    Vector3::Constant(5.00e-05))
+                                                        .finished());
+
+        current_pose_global = Pose3(Rot3(Quaternion(orientation[3], orientation[0], orientation[1], orientation[2])), gps);
+
+        new_values.insert(current_pose_key, current_pose_global);
+        new_values.insert(current_vel_key, current_velocity_global);
+        new_values.insert(current_bias_key, current_bias);
+
+        new_factors.emplace_shared<PriorFactor<Pose3>>(current_pose_key, current_pose_global, sigma_init_x);
+        new_factors.emplace_shared<PriorFactor<Vector3>>(current_vel_key, current_velocity_global, sigma_init_v);
+        new_factors.emplace_shared<PriorFactor<imuBias::ConstantBias>>(current_bias_key, current_bias, sigma_init_b);
     
+        current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
+                                        new PreintegratedImuMeasurements(imu_params, current_bias));
+        included_imu_measurement_count = 0;
+
+        ++GPS_update_count;
+        return;
+    }
+
     // Create IMU factor
     new_factors.emplace_shared<ImuFactor>(previous_pose_key, previous_vel_key,
                                           current_pose_key, current_vel_key,
                                           previous_bias_key, *current_summarized_measurement);
+    //current_summarized_measurement -> print();
 
     //current_summarized_measurement = std::make_shared<PreintegratedImuMeasurements>(imu_params, current_bias);
     current_summarized_measurement = boost::shared_ptr<PreintegratedImuMeasurements>(
@@ -157,34 +195,49 @@ void GTSAM_CORE::addGPS(shared_ptr<PoseMeasurement> ptr) {
 
     // Create GPS factor
     auto gps_pose = Pose3(current_pose_global.rotation(), gps);
-    if ((GPS_update_count % gps_skip) == 0) {
+    //if ((GPS_update_count % gps_skip) == 0) {
     	new_factors.emplace_shared<PriorFactor<Pose3>>(current_pose_key, gps_pose, noise_model_gps);
         new_values.insert(current_pose_key, gps_pose);
 
         //printf("################ POSE INCLUDED AT TIME %lf ################\n", t);
         //gps_pose.translation().print();
         //printf("\n\n");
-    } else {
-        new_values.insert(current_pose_key, current_pose_global);
-    }
+    //} else {
+    //    new_values.insert(current_pose_key, current_pose_global);
+    //}
 
     // Add initial values for velocity and bias based on the previous estimates
     new_values.insert(current_vel_key, current_velocity_global);
     new_values.insert(current_bias_key, current_bias);
 
     if (GPS_update_count > 1 + 2 * gps_skip){
-        //new_factors.print();
+        new_factors.print();
     	isam2.update(new_factors, new_values);
-        Marginals marginals(new_factors, new_values);
-        current_pose_cov = marginals.marginalCovariance(current_pose_key);
+        printf("################ UPDATED ################\n");
+        printf("\n\n");
+
+        //Marginals marginals(new_factors, new_values);
+        //current_pose_cov = marginals.marginalCovariance(current_pose_key);
+        //printf("################ Marginals ################\n");
+        //printf("\n\n");
+
         // Reset the newFactors and newValues list
         new_factors.resize(0);
         new_values.clear();
+
+        printf("################ CLEARED ################\n");
+        printf("\n\n");
     	result = isam2.calculateEstimate(); 
+
+        printf("################ CALCULATED Estimate ################\n");
+        printf("\n\n");
+
 		current_pose_global = result.at<Pose3>(current_pose_key);
 		current_velocity_global = result.at<Vector3>(current_vel_key);
 		current_bias = result.at<imuBias::ConstantBias>(current_bias_key);
     }
+
+    ++GPS_update_count;
 
 }
 
@@ -198,7 +251,7 @@ void GTSAM_CORE::addIMU(shared_ptr<ImuMeasurement> ptr) {
     t1 = t2;
   	Vector3 gyroscope = ptr -> getData().head(3);
   	Vector3 accelerometer = ptr -> getData().tail(3);
-  	Vector4 orientation = ptr -> getOri();
+  	orientation = ptr -> getOri();
   
 	current_summarized_measurement -> integrateMeasurement(accelerometer, gyroscope, dt);
     ++included_imu_measurement_count;

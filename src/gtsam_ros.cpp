@@ -341,6 +341,8 @@ void GTSAM_ROS::gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg) {
 
     shared_ptr<PoseMeasurement> pose_ptr(new PoseMeasurement(pose_msg));
     m_queue_.push(pose_ptr);
+
+    //ros::Duration(2.0).sleep();
 }
 
 // Link States Callback function
