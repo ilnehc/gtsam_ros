@@ -81,21 +81,15 @@ GtLinkMeasurement::GtLinkMeasurement(const gazebo_msgs::LinkStates::ConstPtr& ms
 Eigen::VectorXd GtLinkMeasurement::getPos() { return pos_; }
 Eigen::VectorXd GtLinkMeasurement::getOri() { return ori_; }
 
-/*
 // Construct Landmark measurement
-LandmarkMeasurement::LandmarkMeasurement(const inekf_msgs::LandmarkArray::ConstPtr& msg, const tf::StampedTransform& transform){
-    t_ = msg->header.stamp.toSec();
+LandmarkMeasurement::LandmarkMeasurement(const int id, const Eigen::Vector3d& data, 
+        const GTSAM::Pose3& pose, const double t) : id_(id), data_(data), pose_(pose) {
+    t_ = t;
     type_ = LANDMARK;
-    for (auto it=msg->landmarks.begin(); it!=msg->landmarks.end(); ++it) {
-        tf::Vector3 p_cl(it->position.x, it->position.y, it->position.z);
-        tf::Vector3 p_bl = transform*p_cl; // Transform measurement from camera frame to imu frame
-        Eigen::Vector3d position;
-        position << p_bl.getX(), p_bl.getY(), p_bl.getZ();
-        data_.push_back(Landmark(it->id, position)); 
-    }
 }
-vectorLandmarks LandmarkMeasurement::getData() { return data_; }; 
-*/
+int LandmarkMeasurement::getID() { return id_; }
+Eigen::VectorXd LandmarkMeasurement::getData() { return data_; }
+GTSAM::Pose3 LandmarkMeasurement::getPose() { return pose_; }
 
 // Print measurement
 ostream& operator<<(ostream& os, const Measurement& m) {
@@ -106,6 +100,9 @@ ostream& operator<<(ostream& os, const Measurement& m) {
             break;
         case GPS :
             type_str = "GPS";
+            break;
+        case LANDMARK :
+            type_str = "LANDMARK";
             break;
         default:
             type_str = "Unknown";

@@ -20,6 +20,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <unordered_map>
 #include <map>
 #include <cmath>
 #if GTSAM_USE_MUTEX
@@ -31,6 +32,7 @@
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
+#include <gtsam/sam/BearingRangeFactor.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
@@ -49,6 +51,8 @@ using namespace std;
 using symbol_shorthand::B;  // Bias  (ax,ay,az,gx,gy,gz)
 using symbol_shorthand::V;  // Vel   (xdot,ydot,zdot)
 using symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
+using symbol_shorthand::L;  // Landmark Point3 (x,y,z)
+using symbol_shorthand::EX;	// Inserted estimation Pose3 (x,y,z,r,p,y)
 
 namespace GTSAM {
 
@@ -82,13 +86,19 @@ public:
   	void addGPS(shared_ptr<PoseMeasurement> ptr);	
   	// quaternion(qx,qy,qz,qw), anglular velocity(omegax, omegay, omegaz), linear acceleration(accx, accy, accz)
     void addIMU(shared_ptr<ImuMeasurement> ptr);
+    void addLandmark(shared_ptr<LandmarkMeasurement> ptr);
 
 private:
 	  double t1;
     size_t included_imu_measurement_count;
   	double g_;
     uint64_t GPS_update_count;
+    uint64_t GPS_update_count_store;
   	int gps_skip;
+    uint64_t landmark_count;
+    uint64_t estimationPose_count;
+
+    unordered_map<int, int> landmark_id_to_key;	// (landmark_id, corresponding landmark_count);
 
     boost::shared_ptr<PreintegrationParams> imu_params;
     boost::shared_ptr<PreintegratedImuMeasurements> current_summarized_measurement;

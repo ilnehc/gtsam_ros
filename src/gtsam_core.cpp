@@ -62,6 +62,8 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     // Configure different variables
     t1 = 0;
     GPS_update_count = 1;
+    GPS_update_count_store = 1;
+  	estimationPose_count = 1;
     gps_skip = 10;  // Skip this many GPS measurements each time
     g_ = 0; //9.8;  // 0 for rosbag data
     auto w_coriolis = Vector3::Zero();  // zero vector
@@ -257,6 +259,48 @@ void GTSAM_CORE::addIMU(shared_ptr<ImuMeasurement> ptr) {
     ++included_imu_measurement_count;
 	
 }
+
+void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
+    auto current_pose_key_store = X(GPS_update_count_store);
+    auto estimate_pose_key = EX(estimationPose_count);
+  	++estimationPose_count;
+
+    int landmark_id = ptr -> getID();
+    Vector3 landmark_gps_original = ptr -> getData(); //x y z
+    Pose3 estimate_pose = ptr -> getPose();
+  
+    // 3 DoF, bearing should be normalized, Unit3 bearing
+    auto bearingRangeNoise = noiseModel::Diagonal::Sigmas((Vector(3)<<0.01,0.03,0.05).finished());
+    const SharedDiagonal noiseOdometery = noiseModel::Diagonal::Sigmas((Vector(6) << 0.1, 0.1, 0.1, 0.5, 0.5, 0.5).finished());
+  
+    Point3 landmark_gps = Point3(landmark_gps_original[0], landmark_gps_original[1], landmark_gps_original[2]);
+  	auto bearing11 = current_pose.bearing(landmark_gps);
+    auto range11 = current_pose.range(landmark_gps);
+  
+    if (landmark_id_to_key.find(landmark_id) == landmark_id_to_key.end()) {
+        // Add initial (prior) landmark at first detection
+      	landmark_id_to_key[landmark_id] = landmark_count;
+      	++landmark_count;
+      
+        new_values.insert(L(landmark_count), landmark_gps);
+    }
+    else{
+      // estimation pose - landmark
+      new_factors.emplace_shared<BearingRangeFactor<Pose3, Point3> >(
+            estimate_pose_key, L(landmark_id_to_key[landmark_id]), bearing11, range11, bearingRangeNoise);
+      
+      // estimation pose - current global pose
+      new_factors.push_back(BetweenFactor<Pose3>(estimate_pose_key, current_pose_key_store, estimate_pose.between(current_pose_global), noiseOdometery));
+      
+      printf("################ Added Estimation Pose ################\n");
+      current_pose_global.print();
+	  estimate_pose.print();
+      estimate_pose.between(current_pose_global).print();
+
+    }
+
+}
+
 
 Values GTSAM_CORE::getResult() {
   	return result;
