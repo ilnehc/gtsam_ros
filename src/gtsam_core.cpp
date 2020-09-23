@@ -65,7 +65,7 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
     GPS_update_count_store = 1;
   	estimationPose_count = 1;
     gps_skip = 10;  // Skip this many GPS measurements each time
-    g_ = 0; //9.8;  // 0 for rosbag data
+    g_ = 9.81; // 0 for reorded rosbag data, 9.81 for vrx simulation
     auto w_coriolis = Vector3::Zero();  // zero vector
     orientation = Vector4::Zero();
 

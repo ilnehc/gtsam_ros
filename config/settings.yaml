@@ -1,6 +1,8 @@
 settings:
-  imu_topic: /wamv/sensors/imu/imu/data #"/sensors/an_device/Imu"
-  gps_topic: /wamv/sensors/gps/gps/fix #"/sensors/an_device/NavSatFix"
+#  imu_topic: "/sensors/an_device/Imu_dropped"
+  imu_topic: "/wamv/sensors/imu/imu/data" 
+  gps_topic: "/sensors/an_device/NavSatFix_dropped"
+#  gps_topic: "/wamv/sensors/gps/gps/fix"
   enable_linkstates: false
   map_frame_id : "map"
   base_frame_id: "base_link"

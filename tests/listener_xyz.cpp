@@ -24,9 +24,9 @@ ofstream file;
 void rawCallback_base(const gazebo_msgs::LinkStates::ConstPtr& msg)
 {
 	int n = (msg->pose).size();
-	double x = msg->pose[n-9].position.x;	// 8 is gps_link, 9 is base_link
-	double y = msg->pose[n-9].position.y;
-	double z = msg->pose[n-9].position.z;
+	double x = msg->pose[n-8].position.x;	// 8 is gps_link, 9 is base_link
+	double y = msg->pose[n-8].position.y;
+	double z = msg->pose[n-8].position.z;
 	file.open(filepath_odo.c_str(), ios::app);
 	file.precision(16);
 	file << 0 << "," << x << "," << y << "," << z << endl;
@@ -97,10 +97,10 @@ void filterCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& ms
 
 int main(int argc, char **argv)
 {
-	/*
+	
 	file.open(filepath_odo.c_str());	// base link
 	file << "timestamp [ns]" << "," << "base x" << "," << "base y" << "," << "base z" << endl;
-	file.close();
+	file.close();/*
 	file.open(filepath_rawGps.c_str());
 	file << "timestamp [ns]" << "," << "latitude" << "," << "longitude" << "," << "altitude" << endl;
 	file.close();
@@ -118,6 +118,7 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "listener_xyz_gtsam_node");
   ros::NodeHandle n_;
 
+  ros::Subscriber odo_sub_ = n_.subscribe("/gazebo/link_states", 1000, rawCallback_base);
   //ros::Subscriber imu_sub_ = n_.subscribe("/sensors/an_device/Imu", 1000, rawCallback_imu);
   //ros::Subscriber gps_sub_ = n_.subscribe("/sensors/an_device/NavSatFix", 1000, rawCallback_gps);
   ros::Subscriber filtered_sub_ = n_.subscribe("/wamv/robot_localization/odometry/filtered", 1000, filterCallback);
