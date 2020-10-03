@@ -262,7 +262,7 @@ void GTSAM_CORE::addIMU(shared_ptr<ImuMeasurement> ptr) {
 
 void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
     auto current_pose_key_store = X(GPS_update_count_store);
-    auto estimate_pose_key = EX(estimationPose_count);
+    auto estimate_pose_key = E(estimationPose_count);
   	++estimationPose_count;
 
     int landmark_id = ptr -> getID();
@@ -274,8 +274,8 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
     const SharedDiagonal noiseOdometery = noiseModel::Diagonal::Sigmas((Vector(6) << 0.1, 0.1, 0.1, 0.5, 0.5, 0.5).finished());
   
     Point3 landmark_gps = Point3(landmark_gps_original[0], landmark_gps_original[1], landmark_gps_original[2]);
-  	auto bearing11 = current_pose.bearing(landmark_gps);
-    auto range11 = current_pose.range(landmark_gps);
+  	auto bearing11 = estimate_pose.bearing(landmark_gps);
+    auto range11 = estimate_pose.range(landmark_gps);
   
     if (landmark_id_to_key.find(landmark_id) == landmark_id_to_key.end()) {
         // Add initial (prior) landmark at first detection

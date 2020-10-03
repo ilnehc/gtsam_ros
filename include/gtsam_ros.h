@@ -46,7 +46,8 @@
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/ISAM2.h>
 
-#define QUEUE_BUFFER_SIZE 100
+// !!!! BE CAREFUL !!!!
+#define QUEUE_BUFFER_SIZE 3
 #define MAX_QUEUE_SIZE 150
 
 

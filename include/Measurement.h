@@ -107,15 +107,15 @@ class LandmarkMeasurement : public Measurement {
 
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        LandmarkMeasurement(const int id, const Eigen::Vector3d& data, const GTSAM::Pose3& pose, const double t);
+        LandmarkMeasurement(const int id, const Eigen::Vector3d& data, const gtsam::Pose3& pose, const double t);
         int getID();
         Eigen::VectorXd getData();
-        GTSAM::Pose3 getPose();
+        gtsam::Pose3 getPose();
 
     private:
         int id_;
         Eigen::Matrix<double,3,1> data_;  // x y z
-        GTSAM::Pose3 pose_;     // corresponding robot pose
+        gtsam::Pose3 pose_;     // corresponding robot pose
 };
 
 

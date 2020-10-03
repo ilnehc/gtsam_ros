@@ -3,11 +3,11 @@
 <launch>
 
   <node name="gps_dropper" type="drop" pkg="topic_tools" args="/sensors/an_device/NavSatFix 1 2 /sensors/an_device/NavSatFix_dropped" />
-  <node name="gps_dropper2" type="drop" pkg="topic_tools" args="/sensors/an_device/NavSatFix_dropped 3 4 /sensors/an_device/NavSatFix_dropped2" />
+  <node name="gps_dropper2" type="drop" pkg="topic_tools" args="/sensors/an_device/NavSatFix_dropped 9 10 /sensors/an_device/NavSatFix_dropped2" />
   <node name="imu_dropper" type="drop" pkg="topic_tools" args="/sensors/an_device/Imu 1 2 /sensors/an_device/Imu_dropped" />
   <!-- Create data publisher-->
   <param name="/use_sim_time" value="true" />
-  <node pkg="rosbag" type="play" name="rosbagplay" args="$(find gtsam_ros)/tests/out_2.bag --clock" required="true"/>
+  <node pkg="rosbag" type="play" name="rosbagplay" args="$(find gtsam_ros)/tests/all_sensors_3.bag --clock" required="true"/>
 
   <?ignore
     <node pkg="tf2_ros" type="static_transform_publisher" name="bl_gps" 

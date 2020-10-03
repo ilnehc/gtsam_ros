@@ -83,13 +83,13 @@ Eigen::VectorXd GtLinkMeasurement::getOri() { return ori_; }
 
 // Construct Landmark measurement
 LandmarkMeasurement::LandmarkMeasurement(const int id, const Eigen::Vector3d& data, 
-        const GTSAM::Pose3& pose, const double t) : id_(id), data_(data), pose_(pose) {
+        const gtsam::Pose3& pose, const double t) : id_(id), data_(data), pose_(pose) {
     t_ = t;
     type_ = LANDMARK;
 }
 int LandmarkMeasurement::getID() { return id_; }
 Eigen::VectorXd LandmarkMeasurement::getData() { return data_; }
-GTSAM::Pose3 LandmarkMeasurement::getPose() { return pose_; }
+gtsam::Pose3 LandmarkMeasurement::getPose() { return pose_; }
 
 // Print measurement
 ostream& operator<<(ostream& os, const Measurement& m) {

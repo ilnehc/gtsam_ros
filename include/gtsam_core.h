@@ -52,7 +52,7 @@ using symbol_shorthand::B;  // Bias  (ax,ay,az,gx,gy,gz)
 using symbol_shorthand::V;  // Vel   (xdot,ydot,zdot)
 using symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 using symbol_shorthand::L;  // Landmark Point3 (x,y,z)
-using symbol_shorthand::EX;	// Inserted estimation Pose3 (x,y,z,r,p,y)
+using symbol_shorthand::E;	// Inserted estimation Pose3 (x,y,z,r,p,y)
 
 namespace GTSAM {
 

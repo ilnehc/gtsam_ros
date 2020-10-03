@@ -174,6 +174,8 @@ void GTSAM_ROS::run() {
 
 // Subscribe to all publishers
 void GTSAM_ROS::subscribe() {
+    double start_sub_time = ros::Time::now().toSec();
+
     // Create private node handle to get topic names
     ros::NodeHandle nh("~");
     string imu_topic;
@@ -290,6 +292,10 @@ void GTSAM_ROS::subscribe() {
         landmarks_sub_ = n_.subscribe(landmarks_topic, 1000, &GTSAM_ROS::landmarkCallback, this);
     }
     */
+
+   double end_sub_time = ros::Time::now().toSec();
+   ROS_INFO("subscribe start time: %f", start_sub_time);
+   ROS_INFO("subscribe end time: %f", end_sub_time);
 }
 
 // IMU Callback function
@@ -407,7 +413,9 @@ void GTSAM_ROS::mainIsam2Thread() {
         m_queue_.pop(m_ptr);
         if (m_ptr->getType() == IMU) {
             ROS_INFO("First IMU measurement received. Starting GTSAM.");
+            double current_time = ros::Time::now().toSec();
             t_last = m_ptr->getTime();
+            ROS_INFO("time delayed: %f", current_time - t_last);
             imu_ptr_last = dynamic_pointer_cast<ImuMeasurement>(m_ptr);
             break;
         }
@@ -432,7 +440,9 @@ void GTSAM_ROS::mainIsam2Thread() {
             case IMU: {
                 // ROS_INFO("Propagating state with IMU measurements.");
                 auto imu_ptr = dynamic_pointer_cast<ImuMeasurement>(m_ptr);
+                double current_time = ros::Time::now().toSec();
                 t = imu_ptr->getTime();
+                ROS_INFO("time delayed: %f", current_time - t);
                 //filter_.Propagate(imu_ptr_last->getData(), t - t_last);
                 Core_.addIMU(imu_ptr);
                 t_last = t;
@@ -675,7 +685,12 @@ void GTSAM_ROS::outputPublishingThread() {
         Eigen::Vector3d position = pose.translation().vector();
         pose_msg.pose.pose.position.x = position(0); 
         pose_msg.pose.pose.position.y = position(1); 
-        pose_msg.pose.pose.position.z = position(2); 
+        pose_msg.pose.pose.position.z = position(2);
+        gtsam::Quaternion quat = pose.rotation().toQuaternion();
+        pose_msg.pose.pose.orientation.x = quat.x();
+        pose_msg.pose.pose.orientation.y = quat.y();
+        pose_msg.pose.pose.orientation.z = quat.z();
+        pose_msg.pose.pose.orientation.w = quat.w();
         /*
         Eigen::Quaternion<double> orientation(state.getRotation());
         orientation.normalize();
