@@ -169,6 +169,7 @@ void GTSAM_ROS::run() {
     // Start main processing thread
     isam2_thread_ = std::thread([this]{this->mainIsam2Thread();});
     output_thread_ = std::thread([this]{this->outputPublishingThread();});
+    //rviz_thread_ = std::thread([this]{this->rvizPublishingThread();});
     ros::spin();
 }    
 
@@ -633,17 +634,21 @@ void GTSAM_ROS::outputPublishingThread() {
     // Create private node handle to get topic names
     ros::NodeHandle nh("~");
     double publish_rate;
-    string base_frame_id, pose_topic, state_topic;
+    string base_frame_id, pose_topic, state_topic, path_topic, path_frame_id;
 
     nh.param<double>("settings/publish_rate", publish_rate, 10);
     nh.param<string>("settings/base_frame_id", base_frame_id, "/imu");
     nh.param<string>("settings/pose_topic", pose_topic, "/pose");
     nh.param<string>("settings/state_topic", state_topic, "/state");
+    nh.param<string>("settings/path_topic", path_topic, "/path");
+    nh.param<string>("settings/path_frame_id", path_frame_id, "path");
 
     ROS_INFO("Map frame id set to %s.", map_frame_id_.c_str());
     ROS_INFO("Base frame id set to %s.", base_frame_id.c_str());
+    ROS_INFO("Path frame id set to %s.", path_frame_id.c_str());
     ROS_INFO("Pose topic publishing under %s.", pose_topic.c_str());
     ROS_INFO("State topic publishing under %s.", state_topic.c_str());
+    ROS_INFO("Path topic publishing under %s.", path_topic.c_str());
 
     // TODO: Convert output from IMU frame to base frame 
     ROS_INFO("Waiting for tf lookup between frames %s and %s...", imu_frame_id_.c_str(), base_frame_id.c_str());
@@ -660,6 +665,7 @@ void GTSAM_ROS::outputPublishingThread() {
 
     // Create publishers for pose and state messages
     ros::Publisher pose_pub = n_.advertise<geometry_msgs::PoseWithCovarianceStamped>(pose_topic, 1000);
+    ros::Publisher path_pub = n_.advertise<nav_msgs::Path>(path_topic, 1000);
     //ros::Publisher state_pub = n_.advertise<inekf_msgs::State>(state_topic, 1000);
     static tf::TransformBroadcaster tf_broadcaster;
     
@@ -691,6 +697,19 @@ void GTSAM_ROS::outputPublishingThread() {
         pose_msg.pose.pose.orientation.y = quat.y();
         pose_msg.pose.pose.orientation.z = quat.z();
         pose_msg.pose.pose.orientation.w = quat.w();
+
+        geometry_msgs::PoseStamped final_pose_msg;
+        path.header.seq = seq;
+        path.header.stamp = ros::Time::now();
+        path.header.frame_id = path_frame_id; 
+        final_pose_msg.pose.position.x = position(0); 
+        final_pose_msg.pose.position.y = position(1); 
+        final_pose_msg.pose.position.z = position(2);
+        final_pose_msg.pose.orientation.x = quat.x();
+        final_pose_msg.pose.orientation.y = quat.y();
+        final_pose_msg.pose.orientation.z = quat.z();
+        final_pose_msg.pose.orientation.w = quat.w();
+        path.poses.push_back(final_pose_msg);
         /*
         Eigen::Quaternion<double> orientation(state.getRotation());
         orientation.normalize();
@@ -719,6 +738,7 @@ void GTSAM_ROS::outputPublishingThread() {
         }
         */
         pose_pub.publish(pose_msg);
+        path_pub.publish(path);
 
         /*
         // Create and send tf message
@@ -848,4 +868,56 @@ void GTSAM_ROS::outputPublishingThread() {
         loop_rate.sleep();
     }
 
+}
+
+
+void GTSAM_ROS::rvizPublishingThread() {
+
+    ros::NodeHandle nh("~");
+    double publish_rate = 5;
+    
+    string base_frame_id, pose_topic, state_topic;
+    /*
+    nh.param<double>("settings/publish_rate", publish_rate, 10);
+    nh.param<string>("settings/base_frame_id", base_frame_id, "/imu");
+    nh.param<string>("settings/pose_topic", pose_topic, "/pose");
+    nh.param<string>("settings/state_topic", state_topic, "/state");
+    
+    ROS_INFO("Map frame id set to %s.", map_frame_id_.c_str());
+    ROS_INFO("Base frame id set to %s.", base_frame_id.c_str());
+    ROS_INFO("Pose topic publishing under %s.", pose_topic.c_str());
+    ROS_INFO("State topic publishing under %s.", state_topic.c_str());
+
+    // TODO: Convert output from IMU frame to base frame 
+    ROS_INFO("Waiting for tf lookup between frames %s and %s...", imu_frame_id_.c_str(), base_frame_id.c_str());
+    tf::TransformListener listener;
+    tf::StampedTransform imu_to_base_transform;
+    try {
+        listener.waitForTransform(base_frame_id, imu_frame_id_, ros::Time(0), ros::Duration(1.0) );
+        listener.lookupTransform(base_frame_id, imu_frame_id_, ros::Time(0), imu_to_base_transform);
+        ROS_INFO("Tranform between frames %s and %s was found.", imu_frame_id_.c_str(), base_frame_id.c_str());
+    } catch (tf::TransformException ex) {
+        ROS_ERROR("%s. Using identity transform.",ex.what());
+        imu_to_base_transform = tf::StampedTransform( tf::Transform::getIdentity(), ros::Time::now(), imu_frame_id_, base_frame_id);
+    } 
+
+    // Create publishers for pose and state messages
+    ros::Publisher pose_pub = n_.advertise<geometry_msgs::PoseWithCovarianceStamped>(pose_topic, 1000);
+    //ros::Publisher state_pub = n_.advertise<inekf_msgs::State>(state_topic, 1000);
+    static tf::TransformBroadcaster tf_broadcaster;
+    */
+    // Init loop params
+    uint32_t seq = 0;
+    geometry_msgs::Point point_last;
+    ros::Rate loop_rate(publish_rate);
+
+    while (true) {
+        gtsam::Values result = Core_.getResult();
+        gtsam::KeyVector kv = result.keys();
+        printf("################ KeyVector ################\n");
+        //gtsam::PrintKeyVector(kv);
+
+        loop_rate.sleep();
+    }
+    
 }

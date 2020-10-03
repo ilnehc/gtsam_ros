@@ -26,7 +26,9 @@
 #include "sensor_msgs/Imu.h"
 #include "sensor_msgs/NavSatFix.h"
 #include "gazebo_msgs/LinkStates.h"
+#include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
+#include "nav_msgs/Path.h"
 #include "tf/transform_broadcaster.h"
 #include "tf/transform_listener.h"
 #include "Measurement.h"
@@ -66,6 +68,7 @@ class GTSAM_ROS {
         ros::Subscriber landmarks_sub_;
         std::thread isam2_thread_;
         std::thread output_thread_;
+        std::thread rviz_thread_;
         Queue<std::shared_ptr<Measurement>, std::vector<std::shared_ptr<Measurement>>, MeasurementCompare> m_queue_;
 
         std::string imu_frame_id_;
@@ -77,6 +80,8 @@ class GTSAM_ROS {
         bool enable_landmarks_;
         tf::StampedTransform camera_to_imu_transform_;
         bool enable_linkstates;
+
+        nav_msgs::Path path;
 
         NoiseParams init_params_;
         gtsam::Vector3 initial_linkstate_;
@@ -95,6 +100,7 @@ class GTSAM_ROS {
         void subscribe();
         void mainIsam2Thread();
         void outputPublishingThread();
+        void rvizPublishingThread();
         void imuCallback(const sensor_msgs::Imu::ConstPtr& msg); 
         void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr& msg);
         void linkstatesCallback(const gazebo_msgs::LinkStates::ConstPtr& msg);  
