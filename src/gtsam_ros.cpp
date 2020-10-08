@@ -188,7 +188,9 @@ void GTSAM_ROS::subscribe() {
     imu_frame_id_ = imu_msg->header.frame_id;
 
     Eigen::Quaterniond quat(imu_msg->orientation.w, imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z);
-    Eigen::Vector3d euler = quat.toRotationMatrix().eulerAngles(0, 1, 2);
+    quat.normalize();
+    initial_R_ = quat.toRotationMatrix();
+    Eigen::Vector3d euler = initial_R_.eulerAngles(0, 1, 2);
     initial_yaw_ = euler(2);
     //filter_.SetTfEnuOdo(euler);
 
@@ -213,10 +215,9 @@ void GTSAM_ROS::subscribe() {
         base_to_gps_transform_ = tf::StampedTransform( tf::Transform::getIdentity(), ros::Time::now(), gps_frame_id_, base_frame_id_);
     }
 
-    double x,y,z;
-    nh.param<double>("settings/gps_base_tf_x", x, 0);
-    nh.param<double>("settings/gps_base_tf_y", y, 0);
-    nh.param<double>("settings/gps_base_tf_z", z, 0);
+    double x = base_to_gps_transform_.getOrigin().getX(), 
+           y = base_to_gps_transform_.getOrigin().getY(), 
+           z = base_to_gps_transform_.getOrigin().getZ();
     Og0_to_Ob0_ << x, y, z;
     
     initial_lla_ << gps_msg->latitude, 
@@ -407,6 +408,7 @@ void GTSAM_ROS::mainIsam2Thread() {
     shared_ptr<Measurement> m_ptr;
     shared_ptr<ImuMeasurement> imu_ptr_last;
     double t, t_last;
+    bool first_gps = true;
 
     // Block until first IMU measurement is received
     while (ros::ok()) {
@@ -517,7 +519,7 @@ void GTSAM_ROS::mainIsam2Thread() {
             }
             case POSE: {
                 auto pose_ptr = dynamic_pointer_cast<PoseMeasurement>(m_ptr);
-
+/*
                 if (output_gps_) {
                     file.open(gps_file_path_.c_str(), ios::app);
                     file.precision(16);
@@ -527,8 +529,48 @@ void GTSAM_ROS::mainIsam2Thread() {
                     file << t1 << "," << position(0) << "," << position(1) << "," << position(2) << endl;
                     file.close();
                 }
+*/
+                // transform before add to graph
+                gtsam::Pose3 pose = Core_.getCurPose();
+                gtsam::Quaternion quat = pose.rotation().toQuaternion();
+                Eigen::Vector3d position = pose_ptr->getData();
+                tf::Transform gps_pose;
+                if (first_gps) {
+                    gps_pose.setRotation( tf::Quaternion(
+                        cur_baselink_orientation_[0],cur_baselink_orientation_[1],cur_baselink_orientation_[2],cur_baselink_orientation_[3]) );
+                    first_gps = false;
+                }
+                else {
+                    gps_pose.setRotation( tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()) );
+                }
+                gps_pose.setOrigin( tf::Vector3(position(0),position(1),position(2)) );
+                tf::Transform base_pose = gps_pose * base_to_gps_transform_.inverse();
+                tf::Quaternion base_orientation = base_pose.getRotation().normalize();
+                tf::Vector3 base_position = base_pose.getOrigin();
+                Eigen::Vector3d base_Ob(base_position.getX(),base_position.getY(),base_position.getZ());
+                base_Ob += initial_R_*Og0_to_Ob0_; // subtract origin transition
+                
+                geometry_msgs::PoseWithCovarianceStamped::Ptr pose_msg(new geometry_msgs::PoseWithCovarianceStamped());
+                ros::Time measurement_time(pose_ptr->getTime());
+                pose_msg->header.stamp = measurement_time;
+                pose_msg->header.frame_id = base_frame_id_; 
+                pose_msg->pose.pose.position.x = base_Ob(0); 
+                pose_msg->pose.pose.position.y = base_Ob(1); 
+                pose_msg->pose.pose.position.z = base_Ob(2); 
+                shared_ptr<PoseMeasurement> posePtr(new PoseMeasurement(pose_msg));
 
-                Core_.addGPS(pose_ptr);
+                if (output_gps_) {
+                    file.open(gps_file_path_.c_str(), ios::app);
+                    file.precision(16);
+                    double t = pose_ptr->getTime();
+	                size_t t1 = t * 1e9;
+                    file << t1 << "," << base_Ob(0) << "," << base_Ob(1) << "," << base_Ob(2) << endl;
+                    file.close();
+                }
+
+                Core_.addGPS(posePtr);
+
+                //Core_.addGPS(pose_ptr);
                 break;
             }
             case LINK: {
@@ -687,17 +729,34 @@ void GTSAM_ROS::outputPublishingThread() {
         geometry_msgs::PoseWithCovarianceStamped pose_msg;
         pose_msg.header.seq = seq;
         pose_msg.header.stamp = ros::Time::now();
-        pose_msg.header.frame_id = map_frame_id_; 
+        pose_msg.header.frame_id = map_frame_id_;
         Eigen::Vector3d position = pose.translation().vector();
+        gtsam::Quaternion quat = pose.rotation().toQuaternion();
+         
         pose_msg.pose.pose.position.x = position(0); 
         pose_msg.pose.pose.position.y = position(1); 
         pose_msg.pose.pose.position.z = position(2);
-        gtsam::Quaternion quat = pose.rotation().toQuaternion();
         pose_msg.pose.pose.orientation.x = quat.x();
         pose_msg.pose.pose.orientation.y = quat.y();
         pose_msg.pose.pose.orientation.z = quat.z();
         pose_msg.pose.pose.orientation.w = quat.w();
-
+/*        
+        tf::Transform gps_pose;
+        gps_pose.setRotation( tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()) );
+        gps_pose.setOrigin( tf::Vector3(position(0),position(1),position(2)) );
+        tf::Transform base_pose = gps_pose * base_to_gps_transform_.inverse();
+        tf::Quaternion base_orientation = base_pose.getRotation().normalize();
+        tf::Vector3 base_position = base_pose.getOrigin();
+        Eigen::Vector3d base_Ob(base_position.getX(),base_position.getY(),base_position.getZ());
+        base_Ob += initial_R_*Og0_to_Ob0_; // subtract origin transition
+        pose_msg.pose.pose.position.x = base_Ob(0); 
+        pose_msg.pose.pose.position.y = base_Ob(1); 
+        pose_msg.pose.pose.position.z = base_Ob(2);
+        pose_msg.pose.pose.orientation.x = base_orientation.getX();
+        pose_msg.pose.pose.orientation.y = base_orientation.getY();
+        pose_msg.pose.pose.orientation.z = base_orientation.getZ();
+        pose_msg.pose.pose.orientation.w = base_orientation.getW(); 
+*/
         geometry_msgs::PoseStamped final_pose_msg;
         path.header.seq = seq;
         path.header.stamp = ros::Time::now();

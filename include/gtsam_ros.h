@@ -49,7 +49,7 @@
 #include <gtsam/nonlinear/ISAM2.h>
 
 // !!!! BE CAREFUL !!!!
-#define QUEUE_BUFFER_SIZE 3
+#define QUEUE_BUFFER_SIZE 1
 #define MAX_QUEUE_SIZE 150
 
 
