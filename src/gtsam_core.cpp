@@ -61,6 +61,7 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
 
     // Configure different variables
     t1 = 0;
+    landmark_count = 1;
     GPS_update_count = 1;
     GPS_update_count_store = 1;
   	estimationPose_count = 1;
@@ -290,7 +291,7 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
             estimate_pose_key, L(landmark_id_to_key[landmark_id]), bearing11, range11, bearingRangeNoise);
       
       // estimation pose - current global pose
-      new_factors.push_back(BetweenFactor<Pose3>(estimate_pose_key, current_pose_key_store, estimate_pose.between(current_pose_global), noiseOdometery));
+      new_factors.push_back(BetweenFactor<Pose3>(estimate_pose_key, current_pose_key_store, estimate_pose.between(current_pose_global), noiseOdometery));   // Possible bug
       
       printf("################ Added Estimation Pose ################\n");
       current_pose_global.print();
@@ -301,6 +302,21 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
 
 }
 
+
+int GTSAM_CORE::LandmarkAssociation(const Eigen::Vector3d& query_landmark, gtsam::Values& result, double landmark_thresh){
+    // ROS_INFO("landmark_id_to_key.size(): %d \n", landmark_id_to_key.size());
+    if(landmark_count == 1){return 1;}
+    
+    for(const auto& it : landmark_id_to_key){
+        ROS_INFO("before result at\n");
+        Point3 k = result.at<Point3>(L(it.second));
+        ROS_INFO("after result at\n");
+        Eigen::Vector3d target_landmark(k.x(), k.y(), k.z());
+        double dist = (target_landmark - query_landmark).norm();
+        if (dist < landmark_thresh){ return it.first;}
+    }
+    return landmark_id_to_key.size()+1;
+}
 
 Values GTSAM_CORE::getResult() {
   	return result;

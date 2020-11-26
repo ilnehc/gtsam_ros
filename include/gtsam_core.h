@@ -87,6 +87,7 @@ public:
   	// quaternion(qx,qy,qz,qw), anglular velocity(omegax, omegay, omegaz), linear acceleration(accx, accy, accz)
     void addIMU(shared_ptr<ImuMeasurement> ptr);
     void addLandmark(shared_ptr<LandmarkMeasurement> ptr);
+    int LandmarkAssociation(const Eigen::Vector3d& query_landmark, gtsam::Values& result, double landmark_thresh);
 
 private:
 	  double t1;
