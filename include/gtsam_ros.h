@@ -78,9 +78,11 @@ class GTSAM_ROS {
         std::string gps_frame_id_;
         std::string map_frame_id_;
         std::string base_frame_id_;
+        std::string landmark_frame_id_;
         bool publish_visualization_markers_;
         ros::Publisher visualization_pub_;
         bool enable_landmarks_;
+        bool is_first_landmark_received_;
         tf::StampedTransform camera_to_imu_transform_;
         bool enable_linkstates;
 
