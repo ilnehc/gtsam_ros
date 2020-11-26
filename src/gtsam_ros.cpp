@@ -48,6 +48,7 @@ void GTSAM_ROS::init() {
     nh.param<double>("noise/gps_std", std, 0.3);
     init_params_.setGpsNoise(std);
     nh.param<double>("settings/landmark_threshold", landmark_thresh, 0.3);
+    is_first_landmark_received_ = false;
     //filter_.setNoiseParams(params);
 /*
     // Set initial state and covariance
@@ -278,6 +279,9 @@ void GTSAM_ROS::subscribe() {
     if (enable_landmarks_) {
         nh.param<string>("settings/landmarks_topic", landmarks_topic, "/landmarks");
         ROS_INFO("Enable Landmarks\n");
+        ROS_INFO("Waiting for Landmark message\n");
+        landmark_detection::Landmarksmsg::ConstPtr landmark_msg = ros::topic::waitForMessage<landmark_detection::Landmarksmsg>(landmarks_topic);
+        landmark_frame_id_ = landmark_msg->header.frame_id;
     }
 
 
@@ -391,18 +395,33 @@ void GTSAM_ROS::landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg)
 
 // Landmark Callback function
 void GTSAM_ROS::landmarkCallback(const landmark_detection::Landmarksmsg::ConstPtr& msg) {
+
+    if (!is_first_landmark_received_) {        
+        ROS_INFO("Calling Landmark Callback for the first time\n");
+        int i = 0;
+        for (const auto& landmark : msg->landmarks) {
+            Eigen::Vector3d robot_pose(Core_.getCurPose().x(), Core_.getCurPose().y(),Core_.getCurPose().z());  // Possible bug : .x(), .y() and z
+            Eigen::Vector3d pose(landmark.pose.x, landmark.pose.y,landmark.pose.z);
+            int id = i + 1;
+            shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
+            auto landmark_ptr = dynamic_pointer_cast<LandmarkMeasurement>(ptr);
+            Core_.addLandmark(landmark_ptr);
+            i++;
+        }
+        is_first_landmark_received_ = true;
+        return;
+    }
+
     gtsam::Values result = Core_.getResult();
-    result.print();
-    ROS_INFO("before callback for loop\n");
     for(const auto& landmark : msg->landmarks){
         // convert pose to global frame
-        // gtsam::Pose3 robot_pose = Core_.getCurPose();
-        ROS_INFO("inside callback for loop\n");
         Eigen::Vector3d robot_pose(Core_.getCurPose().x(), Core_.getCurPose().y(),Core_.getCurPose().z());  // Possible bug : .x(), .y() and z
         Eigen::Vector3d pose(landmark.pose.x, landmark.pose.y,landmark.pose.z);
         int id = Core_.LandmarkAssociation(robot_pose + pose, result, landmark_thresh);
-        shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
-        m_queue_.push(ptr);
+        if (id > 0) {
+            shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
+            m_queue_.push(ptr);
+        }
     }
 }
 
