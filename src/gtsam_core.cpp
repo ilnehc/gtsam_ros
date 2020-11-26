@@ -267,26 +267,30 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
   	++estimationPose_count;
 
     int landmark_id = ptr -> getID();
+    
     Vector3 landmark_gps_original = ptr -> getData(); //x y z
     Pose3 estimate_pose = ptr -> getPose();
   
     // 3 DoF, bearing should be normalized, Unit3 bearing
     auto bearingRangeNoise = noiseModel::Diagonal::Sigmas((Vector(3)<<0.01,0.03,0.05).finished());
     const SharedDiagonal noiseOdometery = noiseModel::Diagonal::Sigmas((Vector(6) << 0.1, 0.1, 0.1, 0.5, 0.5, 0.5).finished());
-  
+
     Point3 landmark_gps = Point3(landmark_gps_original[0], landmark_gps_original[1], landmark_gps_original[2]);
   	auto bearing11 = estimate_pose.bearing(landmark_gps);
     auto range11 = estimate_pose.range(landmark_gps);
   
     if (landmark_id_to_key.find(landmark_id) == landmark_id_to_key.end()) {
         // Add initial (prior) landmark at first detection
+        ROS_INFO("New landmark registred with id : %d\n", landmark_id);
       	landmark_id_to_key[landmark_id] = landmark_count;
-      	++landmark_count;
-      
+      	
+        
         new_values.insert(L(landmark_count), landmark_gps);
+        ++landmark_count;
     }
     else{
       // estimation pose - landmark
+      
       new_factors.emplace_shared<BearingRangeFactor<Pose3, Point3> >(
             estimate_pose_key, L(landmark_id_to_key[landmark_id]), bearing11, range11, bearingRangeNoise);
       
@@ -304,18 +308,17 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
 
 
 int GTSAM_CORE::LandmarkAssociation(const Eigen::Vector3d& query_landmark, gtsam::Values& result, double landmark_thresh){
-    // ROS_INFO("landmark_id_to_key.size(): %d \n", landmark_id_to_key.size());
-    if(landmark_count == 1){return 1;}
-    
-    for(const auto& it : landmark_id_to_key){
-        ROS_INFO("before result at\n");
-        Point3 k = result.at<Point3>(L(it.second));
-        ROS_INFO("after result at\n");
-        Eigen::Vector3d target_landmark(k.x(), k.y(), k.z());
-        double dist = (target_landmark - query_landmark).norm();
-        if (dist < landmark_thresh){ return it.first;}
-    }
-    return landmark_id_to_key.size()+1;
+    try {
+        for(const auto& it : landmark_id_to_key){
+            Point3 k = result.at<Point3>(L(it.second));
+            Eigen::Vector3d target_landmark(k.x(), k.y(), k.z());
+            double dist = (target_landmark - query_landmark).norm();
+            if (dist < landmark_thresh){ return it.first;}
+        }
+        return landmark_id_to_key.size()+1;
+    } catch (gtsam::ValuesKeyDoesNotExist ex) {
+        return -1;
+    }    
 }
 
 Values GTSAM_CORE::getResult() {
