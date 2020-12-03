@@ -17,11 +17,12 @@ $ sudo make install
 - Install [GTSAM](https://github.com/borglab/gtsam). Newest version is not compatible. Use version [4.0.3](https://github.com/borglab/gtsam/tree/4.0.3) instead.
 ```bash
 $ git clone https://github.com/borglab/gtsam.git
-$ cd eigen
+$ cd gtsam
 $ mkdir build
 $ cmake ..
 $ sudo make install
 ```
+- Install [landmark_detection](https://github.com/MichiganRobotX/3d_projection) ROS package.
 - Clone this repo into ROS workspace and make:
 ```bash
 $ cd ~/catkin_ws/src/
