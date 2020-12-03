@@ -7,7 +7,9 @@
   <!-- <node name="imu_dropper" type="drop" pkg="topic_tools" args="/wamv/sensors/imu/imu/data 1 2 /sensors/an_device/Imu_dropped" /> -->
   <!-- Create data publisher-->
   <param name="/use_sim_time" value="true" />
-  <node pkg="rosbag" type="play" name="rosbagplay" args="$(find gtsam_ros)/tests/sim.bag --clock" required="true"/>
+  <!--<node pkg="rosbag" type="play" name="rosbagplay" args="$(find gtsam_ros)/tests/sim.bag -clock" required="true"/>-->
+  <!--<node pkg="rosbag" type="play" name="rosbagplay" args="/home/bhushan/Desktop/bag_files/detection2.bag -clock" required="true"/>-->
+
 
   <node pkg="tf" type="static_transform_publisher" name="map_to_path" args="0 0 0 0 0 0 1 map path 10"/>
 

@@ -47,6 +47,8 @@ void GTSAM_ROS::init() {
     init_params_.setLandmarkNoise(std);
     nh.param<double>("noise/gps_std", std, 0.3);
     init_params_.setGpsNoise(std);
+    nh.param<double>("settings/landmark_threshold", landmark_thresh, 0.3);
+    is_first_landmark_received_ = false;
     //filter_.setNoiseParams(params);
 /*
     // Set initial state and covariance
@@ -273,6 +275,16 @@ void GTSAM_ROS::subscribe() {
         }   
     }
     */
+    string landmarks_topic;
+    if (enable_landmarks_) {
+        nh.param<string>("settings/landmarks_topic", landmarks_topic, "/landmarks");
+        ROS_INFO("Enable Landmarks\n");
+        ROS_INFO("Waiting for Landmark message\n");
+        landmark_detection::Landmarksmsg::ConstPtr landmark_msg = ros::topic::waitForMessage<landmark_detection::Landmarksmsg>(landmarks_topic);
+        landmark_frame_id_ = landmark_msg->header.frame_id;
+    }
+
+
 
     // Subscribe to IMU publisher
     ROS_INFO("Subscribing to %s.", imu_topic.c_str());
@@ -294,6 +306,10 @@ void GTSAM_ROS::subscribe() {
         landmarks_sub_ = n_.subscribe(landmarks_topic, 1000, &GTSAM_ROS::landmarkCallback, this);
     }
     */
+    if (enable_landmarks_) {
+        ROS_INFO("Subscribing to %s.", landmarks_topic.c_str());
+        landmarks_sub_ = n_.subscribe(landmarks_topic, 10, &GTSAM_ROS::landmarkCallback, this);
+    }
 
    double end_sub_time = ros::Time::now().toSec();
    ROS_INFO("subscribe start time: %f", start_sub_time);
@@ -365,6 +381,51 @@ void GTSAM_ROS::landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg)
     m_queue_.push(ptr);
 }
 */
+// int GTSAM_ROS::LandmarkAssociation(const Eigen::Vector3d& query_landmark){
+//     gtsam::Values result = Core_.getResult();
+//     for(const auto& it : Core_.landmark_id_to_key){
+//         Point3 k = result.at<Point3>(L(it.second));
+//         Eigen::Vector3d target_landmark(k.x(), k.y(), k.z());
+//         double dist = (target_landmark - query_landmark).norm();
+//         if (dist < landmark_thresh){ return it.first;}
+//     }
+//     return ++Core_.landmark_id_to_key.size();
+// }
+
+
+// Landmark Callback function
+void GTSAM_ROS::landmarkCallback(const landmark_detection::Landmarksmsg::ConstPtr& msg) {
+
+    if (!is_first_landmark_received_) {        
+        ROS_INFO("Calling Landmark Callback for the first time\n");
+        int i = 0;
+        for (const auto& landmark : msg->landmarks) {
+            Eigen::Vector3d robot_pose(Core_.getCurPose().x(), Core_.getCurPose().y(),Core_.getCurPose().z());  // Possible bug : .x(), .y() and z
+            Eigen::Vector3d pose(landmark.pose.x, landmark.pose.y,landmark.pose.z);
+            int id = i + 1;
+            shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
+            auto landmark_ptr = dynamic_pointer_cast<LandmarkMeasurement>(ptr);
+            Core_.addLandmark(landmark_ptr);
+            i++;
+        }
+        is_first_landmark_received_ = true;
+        return;
+    }
+
+    gtsam::Values result = Core_.getResult();
+    for(const auto& landmark : msg->landmarks){
+        // convert pose to global frame
+        Eigen::Vector3d robot_pose(Core_.getCurPose().x(), Core_.getCurPose().y(),Core_.getCurPose().z());  // Possible bug : .x(), .y() and z
+        Eigen::Vector3d pose(landmark.pose.x, landmark.pose.y,landmark.pose.z);
+        int id = Core_.LandmarkAssociation(robot_pose + pose, result, landmark_thresh);
+        if (id > 0) {
+            shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
+            m_queue_.push(ptr);
+        }
+    }
+}
+
+
 // reference to https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
 gtsam::Vector3 GTSAM_ROS::lla_to_ecef(const gtsam::Vector3& lla) {
     const double equatorial_radius = 6378137.0;
@@ -606,6 +667,13 @@ void GTSAM_ROS::mainIsam2Thread() {
                 }
                 break;
             }*/
+            
+            case LANDMARK: {
+                ROS_INFO("Correcting state with LANDMARK measurements.");
+                auto landmark_ptr = dynamic_pointer_cast<LandmarkMeasurement>(m_ptr);
+                Core_.addLandmark(landmark_ptr);
+                break;
+            }
             default:
                 cout << "Unknown measurement, skipping...\n";
         }

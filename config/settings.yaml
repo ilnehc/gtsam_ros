@@ -12,10 +12,11 @@ settings:
   state_topic: "/state"
   publish_visualization_markers: false
   visualization_markers_topic: "/markers"
-  enable_landmarks: false
-  landmarks_topic: "/landmarks"
+  enable_landmarks: true
+  landmarks_topic: "/landmark_detection/landmarks"
   raw_gps_output_path: "/home/chenli/vrx_ws/src/vrx/gtsam_ros/tests/result/data_odo_xyz.csv"
-
+  landmark_threshold: 0.30
+  
 #settings:
 #  imu_topic: "/imu"
 #  map_frame_id : "/map"
