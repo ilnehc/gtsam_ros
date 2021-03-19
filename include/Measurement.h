@@ -107,7 +107,6 @@ class LandmarkMeasurement : public Measurement {
 
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        // LandmarkMeasurement(const int id, const Eigen::Vector3d& data, const gtsam::Pose3& pose, const double t);
         LandmarkMeasurement(const int id, const Eigen::Vector3d& data, const gtsam::Pose3& pose, const double t);
         int getID();
         Eigen::VectorXd getData();

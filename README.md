@@ -1,5 +1,7 @@
 # gtsam_ros
 ROS wrapper for GTSAM/iSAM2
+## Notes
+this is the version after integrated with robotx planning module
 
 ## Getting Started
 - Install ROS melodic.

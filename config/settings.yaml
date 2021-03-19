@@ -2,6 +2,7 @@ settings:
 #  imu_topic: "/sensors/an_device/Imu_dropped"
   imu_topic: "/wamv/sensors/imu/imu/data" 
   gps_topic: "/sensors/an_device/NavSatFix_dropped"
+
 #  gps_topic: "/wamv/sensors/gps/gps/fix"
   enable_linkstates: false
   map_frame_id : "map"
@@ -9,14 +10,16 @@ settings:
   path_frame_id: "path"
   publish_rate: 20
   pose_topic: "/wamv/robot_localization/odometry/filtered"
+  pose_topic4Nav: "/wamv/robot_localization/odometry/gps"
   state_topic: "/state"
   publish_visualization_markers: false
   visualization_markers_topic: "/markers"
-  enable_landmarks: true
-  landmarks_topic: "/landmark_detection/landmarks"
-  raw_gps_output_path: "/home/chenli/vrx_ws/src/vrx/gtsam_ros/tests/result/data_odo_xyz.csv"
-  landmark_threshold: 0.30
-  
+  enable_landmarks: false
+  landmarks_topic: "/landmarks"
+  offset_x: "157.39"
+  offset_y: "107.58"
+  # raw_gps_output_path: "/home/chenli/vrx_ws/src/vrx/gtsam_ros/tests/result/data_odo_xyz.csv"
+
 #settings:
 #  imu_topic: "/imu"
 #  map_frame_id : "/map"

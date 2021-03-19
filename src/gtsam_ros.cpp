@@ -47,8 +47,6 @@ void GTSAM_ROS::init() {
     init_params_.setLandmarkNoise(std);
     nh.param<double>("noise/gps_std", std, 0.3);
     init_params_.setGpsNoise(std);
-    nh.param<double>("settings/landmark_threshold", landmark_thresh, 0.3);
-    is_first_landmark_received_ = false;
     //filter_.setNoiseParams(params);
 /*
     // Set initial state and covariance
@@ -275,16 +273,6 @@ void GTSAM_ROS::subscribe() {
         }   
     }
     */
-    string landmarks_topic;
-    if (enable_landmarks_) {
-        nh.param<string>("settings/landmarks_topic", landmarks_topic, "/landmarks");
-        ROS_INFO("Enable Landmarks\n");
-        ROS_INFO("Waiting for Landmark message\n");
-        landmark_detection::Landmarksmsg::ConstPtr landmark_msg = ros::topic::waitForMessage<landmark_detection::Landmarksmsg>(landmarks_topic);
-        landmark_frame_id_ = landmark_msg->header.frame_id;
-    }
-
-
 
     // Subscribe to IMU publisher
     ROS_INFO("Subscribing to %s.", imu_topic.c_str());
@@ -306,10 +294,6 @@ void GTSAM_ROS::subscribe() {
         landmarks_sub_ = n_.subscribe(landmarks_topic, 1000, &GTSAM_ROS::landmarkCallback, this);
     }
     */
-    if (enable_landmarks_) {
-        ROS_INFO("Subscribing to %s.", landmarks_topic.c_str());
-        landmarks_sub_ = n_.subscribe(landmarks_topic, 10, &GTSAM_ROS::landmarkCallback, this);
-    }
 
    double end_sub_time = ros::Time::now().toSec();
    ROS_INFO("subscribe start time: %f", start_sub_time);
@@ -381,51 +365,6 @@ void GTSAM_ROS::landmarkCallback(const inekf_msgs::LandmarkArray::ConstPtr& msg)
     m_queue_.push(ptr);
 }
 */
-// int GTSAM_ROS::LandmarkAssociation(const Eigen::Vector3d& query_landmark){
-//     gtsam::Values result = Core_.getResult();
-//     for(const auto& it : Core_.landmark_id_to_key){
-//         Point3 k = result.at<Point3>(L(it.second));
-//         Eigen::Vector3d target_landmark(k.x(), k.y(), k.z());
-//         double dist = (target_landmark - query_landmark).norm();
-//         if (dist < landmark_thresh){ return it.first;}
-//     }
-//     return ++Core_.landmark_id_to_key.size();
-// }
-
-
-// Landmark Callback function
-void GTSAM_ROS::landmarkCallback(const landmark_detection::Landmarksmsg::ConstPtr& msg) {
-
-    if (!is_first_landmark_received_) {        
-        ROS_INFO("Calling Landmark Callback for the first time\n");
-        int i = 0;
-        for (const auto& landmark : msg->landmarks) {
-            Eigen::Vector3d robot_pose(Core_.getCurPose().x(), Core_.getCurPose().y(),Core_.getCurPose().z());  // Possible bug : .x(), .y() and z
-            Eigen::Vector3d pose(landmark.pose.x, landmark.pose.y,landmark.pose.z);
-            int id = i + 1;
-            shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
-            auto landmark_ptr = dynamic_pointer_cast<LandmarkMeasurement>(ptr);
-            Core_.addLandmark(landmark_ptr);
-            i++;
-        }
-        is_first_landmark_received_ = true;
-        return;
-    }
-
-    gtsam::Values result = Core_.getResult();
-    for(const auto& landmark : msg->landmarks){
-        // convert pose to global frame
-        Eigen::Vector3d robot_pose(Core_.getCurPose().x(), Core_.getCurPose().y(),Core_.getCurPose().z());  // Possible bug : .x(), .y() and z
-        Eigen::Vector3d pose(landmark.pose.x, landmark.pose.y,landmark.pose.z);
-        int id = Core_.LandmarkAssociation(robot_pose + pose, result, landmark_thresh);
-        if (id > 0) {
-            shared_ptr<Measurement> ptr(new LandmarkMeasurement(id, robot_pose + pose, Core_.getCurPose(), msg->header.stamp.toSec()));
-            m_queue_.push(ptr);
-        }
-    }
-}
-
-
 // reference to https://en.wikipedia.org/wiki/Geographic_coordinate_conversion
 gtsam::Vector3 GTSAM_ROS::lla_to_ecef(const gtsam::Vector3& lla) {
     const double equatorial_radius = 6378137.0;
@@ -667,13 +606,6 @@ void GTSAM_ROS::mainIsam2Thread() {
                 }
                 break;
             }*/
-            
-            case LANDMARK: {
-                ROS_INFO("Correcting state with LANDMARK measurements.");
-                auto landmark_ptr = dynamic_pointer_cast<LandmarkMeasurement>(m_ptr);
-                Core_.addLandmark(landmark_ptr);
-                break;
-            }
             default:
                 cout << "Unknown measurement, skipping...\n";
         }
@@ -745,20 +677,30 @@ void GTSAM_ROS::outputPublishingThread() {
     ros::NodeHandle nh("~");
     double publish_rate;
     string base_frame_id, pose_topic, state_topic, path_topic, path_frame_id;
+    string pose_topic4Nav;
+    string offset_x, offset_y;
 
     nh.param<double>("settings/publish_rate", publish_rate, 10);
     nh.param<string>("settings/base_frame_id", base_frame_id, "/imu");
     nh.param<string>("settings/pose_topic", pose_topic, "/pose");
+    nh.param<string>("settings/pose_topic4Nav", pose_topic4Nav, "/pose");
     nh.param<string>("settings/state_topic", state_topic, "/state");
     nh.param<string>("settings/path_topic", path_topic, "/path");
     nh.param<string>("settings/path_frame_id", path_frame_id, "path");
+
+    nh.param<string>("settings/offset_x", offset_x, "offx");
+    nh.param<string>("settings/offset_y", offset_y, "offy");
 
     ROS_INFO("Map frame id set to %s.", map_frame_id_.c_str());
     ROS_INFO("Base frame id set to %s.", base_frame_id.c_str());
     ROS_INFO("Path frame id set to %s.", path_frame_id.c_str());
     ROS_INFO("Pose topic publishing under %s.", pose_topic.c_str());
+    ROS_INFO("Pose topic Nav publishing under %s.", pose_topic4Nav.c_str());
     ROS_INFO("State topic publishing under %s.", state_topic.c_str());
     ROS_INFO("Path topic publishing under %s.", path_topic.c_str());
+
+    ROS_INFO("offset_x %s.", offset_x.c_str());
+    ROS_INFO("offset_y %s.", offset_y.c_str());
 
     // TODO: Convert output from IMU frame to base frame 
     ROS_INFO("Waiting for tf lookup between frames %s and %s...", imu_frame_id_.c_str(), base_frame_id.c_str());
@@ -775,6 +717,7 @@ void GTSAM_ROS::outputPublishingThread() {
 
     // Create publishers for pose and state messages
     ros::Publisher pose_pub = n_.advertise<geometry_msgs::PoseWithCovarianceStamped>(pose_topic, 1000);
+    ros::Publisher poseNav_pub = n_.advertise<nav_msgs::Odometry>(pose_topic4Nav, 1000);
     ros::Publisher path_pub = n_.advertise<nav_msgs::Path>(path_topic, 1000);
     //ros::Publisher state_pub = n_.advertise<inekf_msgs::State>(state_topic, 1000);
     static tf::TransformBroadcaster tf_broadcaster;
@@ -787,6 +730,7 @@ void GTSAM_ROS::outputPublishingThread() {
     // Main loop
     while(true) {
         gtsam::Pose3 pose = Core_.getCurPose();
+        gtsam::Vector6 twist = Core_.getTwist();
         /*
         RobotState state = filter_.getState();
         Eigen::MatrixXd X = state.getX();
@@ -799,6 +743,10 @@ void GTSAM_ROS::outputPublishingThread() {
         pose_msg.header.stamp = ros::Time::now();
         pose_msg.header.frame_id = map_frame_id_;
         Eigen::Vector3d position = pose.translation().vector();
+        position(0) += std::stof(offset_x);
+        position(1) += std::stof(offset_y);
+        // position(0) += 157.39;
+        // position(1) += 107.58;
         gtsam::Quaternion quat = pose.rotation().toQuaternion();
          
         pose_msg.pose.pose.position.x = position(0); 
@@ -808,6 +756,33 @@ void GTSAM_ROS::outputPublishingThread() {
         pose_msg.pose.pose.orientation.y = quat.y();
         pose_msg.pose.pose.orientation.z = quat.z();
         pose_msg.pose.pose.orientation.w = quat.w();
+
+        // Create and send pose msg for nav // pose here is current one
+        nav_msgs::Odometry OdomPose_msg;
+        OdomPose_msg.header.seq = seq;
+        OdomPose_msg.header.stamp = ros::Time::now();
+        OdomPose_msg.header.frame_id = map_frame_id_;
+
+        // Eigen::Vector3d position = pose.translation().vector();
+        // gtsam::Quaternion quat = pose.rotation().toQuaternion();
+
+        // let covariance blank here
+         
+        OdomPose_msg.pose.pose.position.x = position(0); 
+        OdomPose_msg.pose.pose.position.y = position(1); 
+        OdomPose_msg.pose.pose.position.z = position(2);
+        OdomPose_msg.pose.pose.orientation.x = quat.x();
+        OdomPose_msg.pose.pose.orientation.y = quat.y();
+        OdomPose_msg.pose.pose.orientation.z = quat.z();
+        OdomPose_msg.pose.pose.orientation.w = quat.w();
+
+        OdomPose_msg.twist.twist.linear.x = twist(3);
+        OdomPose_msg.twist.twist.linear.y = twist(4);
+        OdomPose_msg.twist.twist.linear.z = twist(5);
+        OdomPose_msg.twist.twist.angular.x = twist(0);
+        OdomPose_msg.twist.twist.angular.y = twist(1);
+        OdomPose_msg.twist.twist.angular.z = twist(2);
+
 /*        
         tf::Transform gps_pose;
         gps_pose.setRotation( tf::Quaternion(quat.x(),quat.y(),quat.z(),quat.w()) );
@@ -866,7 +841,24 @@ void GTSAM_ROS::outputPublishingThread() {
         */
         pose_pub.publish(pose_msg);
         path_pub.publish(path);
+        poseNav_pub.publish(OdomPose_msg);
 
+        static tf2_ros::TransformBroadcaster br;
+        geometry_msgs::TransformStamped transformStamped;
+        
+        transformStamped.header.stamp = ros::Time::now();
+        transformStamped.header.frame_id = "wamv/odom";
+        transformStamped.child_frame_id = "wamv/base_link";
+        transformStamped.transform.translation.x = position(0);
+        transformStamped.transform.translation.y = position(1); 
+        transformStamped.transform.translation.z = position(2); 
+        
+        transformStamped.transform.rotation.x = quat.x();
+        transformStamped.transform.rotation.y = quat.y();
+        transformStamped.transform.rotation.z = quat.z();
+        transformStamped.transform.rotation.w = quat.w();
+      
+        br.sendTransform(transformStamped);
         /*
         // Create and send tf message
         tf_broadcaster.sendTransform(tf::StampedTransform(base_pose, ros::Time::now(), map_frame_id_, base_frame_id));
