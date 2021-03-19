@@ -81,13 +81,13 @@ public:
     Pose3 getCurPose();
   	Values getResult();
     Matrix getMarginalPoseCov();
+    Vector6 getTwist();
 
     // x, y, z
   	void addGPS(shared_ptr<PoseMeasurement> ptr);	
   	// quaternion(qx,qy,qz,qw), anglular velocity(omegax, omegay, omegaz), linear acceleration(accx, accy, accz)
     void addIMU(shared_ptr<ImuMeasurement> ptr);
     void addLandmark(shared_ptr<LandmarkMeasurement> ptr);
-    int LandmarkAssociation(const Eigen::Vector3d& query_landmark, gtsam::Values& result, double landmark_thresh);
 
 private:
 	  double t1;
@@ -98,6 +98,7 @@ private:
   	int gps_skip;
     uint64_t landmark_count;
     uint64_t estimationPose_count;
+    Vector6 twist_;
 
     unordered_map<int, int> landmark_id_to_key;	// (landmark_id, corresponding landmark_count);
 

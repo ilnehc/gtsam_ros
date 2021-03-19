@@ -61,7 +61,6 @@ void GTSAM_CORE::initialize(Vector12& calibration, Vector3& position) {
 
     // Configure different variables
     t1 = 0;
-    landmark_count = 1;
     GPS_update_count = 1;
     GPS_update_count_store = 1;
   	estimationPose_count = 1;
@@ -255,7 +254,17 @@ void GTSAM_CORE::addIMU(shared_ptr<ImuMeasurement> ptr) {
   	Vector3 gyroscope = ptr -> getData().head(3);
   	Vector3 accelerometer = ptr -> getData().tail(3);
   	orientation = ptr -> getOri();
-  
+
+    twist_.head(3) = gyroscope * dt;
+    twist_.tail(3) = accelerometer * dt;
+
+    // twist_(0) = gyroscope(0)*dt;
+    // twist_(1) = gyroscope(1)*dt;
+    // twist_(2) = gyroscope(2)*dt;
+    // twist_(3) = accelerometer(0)*dt;
+    // twist_(4) = accelerometer(1)*dt;
+    // twist_(5) = accelerometer(2)*dt;
+
 	current_summarized_measurement -> integrateMeasurement(accelerometer, gyroscope, dt);
     ++included_imu_measurement_count;
 	
@@ -267,35 +276,31 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
   	++estimationPose_count;
 
     int landmark_id = ptr -> getID();
-    
     Vector3 landmark_gps_original = ptr -> getData(); //x y z
     Pose3 estimate_pose = ptr -> getPose();
   
     // 3 DoF, bearing should be normalized, Unit3 bearing
     auto bearingRangeNoise = noiseModel::Diagonal::Sigmas((Vector(3)<<0.01,0.03,0.05).finished());
     const SharedDiagonal noiseOdometery = noiseModel::Diagonal::Sigmas((Vector(6) << 0.1, 0.1, 0.1, 0.5, 0.5, 0.5).finished());
-
+  
     Point3 landmark_gps = Point3(landmark_gps_original[0], landmark_gps_original[1], landmark_gps_original[2]);
   	auto bearing11 = estimate_pose.bearing(landmark_gps);
     auto range11 = estimate_pose.range(landmark_gps);
   
     if (landmark_id_to_key.find(landmark_id) == landmark_id_to_key.end()) {
         // Add initial (prior) landmark at first detection
-        ROS_INFO("New landmark registred with id : %d\n", landmark_id);
       	landmark_id_to_key[landmark_id] = landmark_count;
-      	
-        
+      	++landmark_count;
+      
         new_values.insert(L(landmark_count), landmark_gps);
-        ++landmark_count;
     }
     else{
       // estimation pose - landmark
-      
       new_factors.emplace_shared<BearingRangeFactor<Pose3, Point3> >(
             estimate_pose_key, L(landmark_id_to_key[landmark_id]), bearing11, range11, bearingRangeNoise);
       
       // estimation pose - current global pose
-      new_factors.push_back(BetweenFactor<Pose3>(estimate_pose_key, current_pose_key_store, estimate_pose.between(current_pose_global), noiseOdometery));   // Possible bug
+      new_factors.push_back(BetweenFactor<Pose3>(estimate_pose_key, current_pose_key_store, estimate_pose.between(current_pose_global), noiseOdometery));
       
       printf("################ Added Estimation Pose ################\n");
       current_pose_global.print();
@@ -306,20 +311,6 @@ void GTSAM_CORE::addLandmark(shared_ptr<LandmarkMeasurement> ptr) {
 
 }
 
-
-int GTSAM_CORE::LandmarkAssociation(const Eigen::Vector3d& query_landmark, gtsam::Values& result, double landmark_thresh){
-    try {
-        for(const auto& it : landmark_id_to_key){
-            Point3 k = result.at<Point3>(L(it.second));
-            Eigen::Vector3d target_landmark(k.x(), k.y(), k.z());
-            double dist = (target_landmark - query_landmark).norm();
-            if (dist < landmark_thresh){ return it.first;}
-        }
-        return landmark_id_to_key.size()+1;
-    } catch (gtsam::ValuesKeyDoesNotExist ex) {
-        return -1;
-    }    
-}
 
 Values GTSAM_CORE::getResult() {
   	return result;
@@ -333,6 +324,8 @@ Matrix GTSAM_CORE::getMarginalPoseCov() {
     return current_pose_cov;
 }
 
-
+Vector6 GTSAM_CORE::getTwist() {
+  	return twist_;
+}  
 
 }   // end of namespace GTSAM

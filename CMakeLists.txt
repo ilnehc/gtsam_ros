@@ -14,7 +14,6 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   tf
-  landmark_detection
 )
 
 ## System dependencies are found with CMake's conventions
@@ -129,7 +128,7 @@ message("GTSAM_INCLUDE_DIR: " ${GTSAM_INCLUDE_DIR})
 catkin_package(
    INCLUDE_DIRS include
 #  LIBRARIES gtsam_ros
-   CATKIN_DEPENDS roscpp rospy sensor_msgs std_msgs tf landmark_detection
+   CATKIN_DEPENDS roscpp rospy sensor_msgs std_msgs tf
 #  DEPENDS system_lib
 )
 
